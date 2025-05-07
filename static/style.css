@@ -2,6 +2,10 @@ body {
     background: green;
 }
 
+#canvas {
+    user-select: none;
+}
+
 .cursor {
     position: fixed;
     font-size: 9px;
