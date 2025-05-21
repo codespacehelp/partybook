@@ -1,55 +1,107 @@
 import PartySocket from "https://esm.sh/partysocket";
+import { h, render } from "preact";
+import { useState, useEffect, useRef } from "preact/hooks";
+import htm from "htm";
+const html = htm.bind(h);
 
 const cursors = new Map();
-const itemMap = new Map();
+let items = [];
 const svgEl = document.querySelector("svg#canvas");
 let activeItemId = null;
 
-const ws = new PartySocket({
-  // host: "project-name.username.partykit.dev",
-  host: "localhost:1999",
-  room: "test",
-  // id: "sera"
-});
+function App() {
+  const [items, setItems] = useState([]);
+  const [cursors, setCursors] = useState([]);
 
-ws.addEventListener("message", (e) => {
-  const message = JSON.parse(e.data);
-  if (message.type === "connect") {
-    const cursorEl = document.createElement("div");
-    cursorEl.className = "cursor";
-    cursorEl.textContent = message.id;
-    document.querySelector("#cursors").appendChild(cursorEl);
-    cursors.set(message.id, cursorEl);
-  } else if (message.type === "disconnect") {
-    const cursorEl = cursors.get(message.id);
-    document.querySelector("#cursors").removeChild(cursorEl);
-    cursors.delete(message.id);
-  } else if (message.type === "cursor") {
-    // console.log(message);
-    const cursorEl = cursors.get(message.id);
-    cursorEl.style.left = `${message.x}px`;
-    cursorEl.style.top = `${message.y}px`;
-  } else if (message.type === "initial_items") {
-    createOrUpdateItems(message.items);
-  } else if (message.type === "item_move") {
-    console.log(message);
-    const itemEl = itemMap.get(message.itemId);
-    itemEl.setAttribute("x", message.x);
-    itemEl.setAttribute("y", message.y);
+  useEffect(() => {
+    // Run this only once at the start.
 
-    // createOrUpdateItems(message.items);
+    // Initialize PartySocket
+    const ws = new PartySocket({
+      // host: "project-name.username.partykit.dev",
+      host: "localhost:1999",
+      room: "test",
+      // id: "sera"
+    });
+
+    // Listen to messages
+    ws.addEventListener("message", (e) => {
+      const message = JSON.parse(e.data);
+      if (message.type === "initial_items") {
+        setItems(message.items);
+        console.log(message.items);
+      } else if (message.type === "initial_cursors") {
+        setCursors(message.cursors);
+        console.log(message.cursors);
+      } else if (message.type === "connect") {
+      } else if (message.type === "disconnect") {
+      } else if (message.type === "cursor") {
+        const newCursors = structuredClone(cursors);
+        const newCursor = newCursors.find((c) => c.id === message.id);
+        newCursor.x = message.x;
+        newCursor.y = message.y;
+        setCursors(newCursors);
+      } else if (message.type === "item_move") {
+        const newItems = structuredClone(items);
+        const item = newItems.find((it) => it.id === message.id);
+        item.x = message.x;
+        item.y = message.y;
+        setItems(newItems);
+      }
+    });
+
+    // Start the connection
+    ws.reconnect();
+
+    // Listen to mouse move events
+    window.addEventListener("mousemove", (e) => {
+      ws.send(JSON.stringify({ type: "cursor", id: ws.id, x: e.clientX, y: e.clientY }));
+    });
+  }, []);
+
+  function handleUpdateItem(item) {
+    const newItems = structuredClone(items);
+    const idx = newItems.findIndex((it) => it.id === item.id);
+    newItems[idx] = item;
+    setItems(newItems);
   }
-});
 
-ws.reconnect();
+  return html`<svg width="800" height="600" viewBox="0 0 800 600">
+    ${items.map((item) => {
+      if (item.type === "image") {
+        return html`<${ImageItem} item=${item} handleUpdateItem=${handleUpdateItem} />`;
+      }
+    })}
+  </svg>`;
+}
 
-document.querySelector("#test-send").addEventListener("click", () => {
-  ws.send("hello!");
-});
+function ImageItem({ item, handleUpdateItem }) {
+  // const startPosition = useRef({ x: 0, y: 0 });
 
-window.addEventListener("mousemove", (e) => {
-  ws.send(JSON.stringify({ type: "cursor", id: ws.id, x: e.clientX, y: e.clientY }));
-});
+  function handleMouseDown() {
+    // originalPosition.current = { x: item.x, y: item.y };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }
+
+  function handleMouseMove(e) {
+    const newX = item.x + e.movementX;
+    const newY = item.y + e.movementY;
+    console.log(newX, newY);
+    handleUpdateItem({ ...item, x: newX, y: newY });
+  }
+
+  function handleMouseUp() {
+    window.removeEventListener("mousemove", handleMouseMove);
+    window.removeEventListener("mouseup", handleMouseUp);
+  }
+
+  return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} />`;
+}
+
+// document.querySelector("#test-send").addEventListener("click", () => {
+//   ws.send("hello!");
+// });
 
 function createOrUpdateItems(items) {
   svgEl.innerHTML = "";
@@ -93,3 +145,5 @@ function handleItemMouseUp(e) {
   window.removeEventListener("mouseup", handleItemMouseUp);
   activeItemId = null;
 }
+
+render(html`<${App} />`, document.getElementById("root"));
