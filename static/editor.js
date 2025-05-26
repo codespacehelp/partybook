@@ -1,23 +1,26 @@
 import PartySocket from "https://esm.sh/partysocket";
 import { h, render } from "preact";
-import { useState, useEffect, useRef } from "preact/hooks";
+import { useState, useEffect, useRef, useMemo } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
-
-const cursors = new Map();
-let items = [];
-const svgEl = document.querySelector("svg#canvas");
-let activeItemId = null;
 
 function App() {
   const [items, setItems] = useState([]);
   const [cursors, setCursors] = useState([]);
+  const [selection, setSelection] = useState([]); // List of selected IDs
+  const startMousePositionRef = useRef();
+  const startItemPositionsRef = useRef();
+  const wsRef = useRef();
+
+  function getSelectedItems() {
+    return selection.map((id) => items.find((it) => it.id === id));
+  }
 
   useEffect(() => {
     // Run this only once at the start.
 
     // Initialize PartySocket
-    const ws = new PartySocket({
+    wsRef.current = new PartySocket({
       // host: "project-name.username.partykit.dev",
       host: "localhost:1999",
       room: "test",
@@ -25,7 +28,7 @@ function App() {
     });
 
     // Listen to messages
-    ws.addEventListener("message", (e) => {
+    wsRef.current.addEventListener("message", (e) => {
       const message = JSON.parse(e.data);
       if (message.type === "initial_items") {
         setItems(message.items);
@@ -37,11 +40,16 @@ function App() {
       } else if (message.type === "disconnect") {
       } else if (message.type === "cursor") {
         const newCursors = structuredClone(cursors);
-        const newCursor = newCursors.find((c) => c.id === message.id);
+        let newCursor = newCursors.find((c) => c.id === message.id);
+        if (!newCursor) {
+          newCursor = { x: 0, y: 0 };
+          newCursors.push(newCursor);
+        }
         newCursor.x = message.x;
         newCursor.y = message.y;
         setCursors(newCursors);
       } else if (message.type === "item_move") {
+        console.log(message);
         const newItems = structuredClone(items);
         const item = newItems.find((it) => it.id === message.id);
         item.x = message.x;
@@ -51,11 +59,11 @@ function App() {
     });
 
     // Start the connection
-    ws.reconnect();
+    wsRef.current.reconnect();
 
     // Listen to mouse move events
     window.addEventListener("mousemove", (e) => {
-      ws.send(JSON.stringify({ type: "cursor", id: ws.id, x: e.clientX, y: e.clientY }));
+      wsRef.current.send(JSON.stringify({ type: "cursor", id: wsRef.current.id, x: e.clientX, y: e.clientY }));
     });
   }, []);
 
@@ -66,84 +74,67 @@ function App() {
     setItems(newItems);
   }
 
+  function handleItemMouseDown(event, item) {
+    setSelection([item.id]);
+    startMousePositionRef.current = { x: event.clientX, y: event.clientY };
+    startItemPositionsRef.current = getSelectedItems().map((item) => ({ id: item.id, x: item.x, y: item.y }));
+    console.log(startMousePositionRef.current, startItemPositionsRef.current);
+  }
+
+  function handleItemMouseDrag(event) {
+    const startX = startMousePositionRef.current.x;
+    const startY = startMousePositionRef.current.y;
+    const currentX = event.clientX;
+    const currentY = event.clientY;
+    const deltaX = currentX - startX;
+    const deltaY = currentY - startY;
+    const newItems = structuredClone(items);
+    for (const item of newItems) {
+      if (selection.includes(item.id)) {
+        const startPosition = startItemPositionsRef.current.find((pos) => pos.id === item.id);
+        item.x = startPosition.x + deltaX;
+        item.y = startPosition.y + deltaY;
+        // Tell PartyKit the item has moved.
+        wsRef.current.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
+      }
+    }
+    setItems(newItems);
+  }
+
   return html`<svg width="800" height="600" viewBox="0 0 800 600">
     ${items.map((item) => {
       if (item.type === "image") {
-        return html`<${ImageItem} item=${item} handleUpdateItem=${handleUpdateItem} />`;
+        return html`<${ImageItem}
+          item=${item}
+          handleUpdateItem=${handleUpdateItem}
+          handleItemMouseDown=${handleItemMouseDown}
+          handleItemMouseDrag=${handleItemMouseDrag}
+        />`;
       }
     })}
   </svg>`;
 }
 
-function ImageItem({ item, handleUpdateItem }) {
-  // const startPosition = useRef({ x: 0, y: 0 });
-
-  function handleMouseDown() {
-    // originalPosition.current = { x: item.x, y: item.y };
-    window.addEventListener("mousemove", handleMouseMove);
+function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
+  function handleMouseDown(event) {
+    handleItemMouseDown(event, item);
+    window.addEventListener("mousemove", handleMouseDrag);
     window.addEventListener("mouseup", handleMouseUp);
   }
 
-  function handleMouseMove(e) {
-    const newX = item.x + e.movementX;
-    const newY = item.y + e.movementY;
-    console.log(newX, newY);
-    handleUpdateItem({ ...item, x: newX, y: newY });
+  function handleMouseDrag(event) {
+    // const newX = item.x + e.movementX;
+    // const newY = item.y + e.movementY;
+    // console.log(newX, newY);
+    handleItemMouseDrag(event);
   }
 
   function handleMouseUp() {
-    window.removeEventListener("mousemove", handleMouseMove);
+    window.removeEventListener("mousemove", handleMouseDrag);
     window.removeEventListener("mouseup", handleMouseUp);
   }
 
   return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} />`;
-}
-
-// document.querySelector("#test-send").addEventListener("click", () => {
-//   ws.send("hello!");
-// });
-
-function createOrUpdateItems(items) {
-  svgEl.innerHTML = "";
-  for (const item of items) {
-    if (item.type === "image") {
-      const imageEl = document.createElementNS("http://www.w3.org/2000/svg", "image");
-      imageEl.dataset.itemId = item.id;
-      imageEl.setAttribute("x", item.x);
-      imageEl.setAttribute("y", item.y);
-      imageEl.setAttribute("href", item.url);
-      // imageEl.setAttribute("transform", "scale(0.2)");
-      imageEl.addEventListener("mousedown", handleItemMouseDown);
-      itemMap.set(item.id, imageEl);
-      svgEl.appendChild(imageEl);
-    }
-  }
-}
-
-function handleItemMouseDown(e) {
-  // console.log(e);
-  activeItemId = e.target.dataset.itemId;
-
-  window.addEventListener("mousemove", handleItemMouseMove);
-  window.addEventListener("mouseup", handleItemMouseUp);
-}
-
-function handleItemMouseMove(e) {
-  const imageEl = itemMap.get(activeItemId);
-  console.log(imageEl.getAttribute("x"), imageEl.getAttribute("y"));
-  const oldX = parseInt(imageEl.getAttribute("x"));
-  const oldY = parseInt(imageEl.getAttribute("y"));
-  const newX = oldX + e.movementX;
-  const newY = oldY + e.movementY;
-  imageEl.setAttribute("x", newX);
-  imageEl.setAttribute("y", newY);
-  ws.send(JSON.stringify({ type: "item_move", id: ws.id, itemId: activeItemId, x: newX, y: newY }));
-}
-
-function handleItemMouseUp(e) {
-  window.removeEventListener("mousemove", handleItemMouseMove);
-  window.removeEventListener("mouseup", handleItemMouseUp);
-  activeItemId = null;
 }
 
 render(html`<${App} />`, document.getElementById("root"));
