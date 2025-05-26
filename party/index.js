@@ -45,6 +45,7 @@ class PartyServer {
 
   async onStart() {
     this.items = (await this.room.storage.get("items")) ?? DEFAULT_BOOK_ITEMS;
+    this.cursors = [];
   }
 
   /**
@@ -55,8 +56,11 @@ class PartyServer {
     // A websocket just connected!
     console.log(`Connected: id: ${conn.id} room: ${this.room.id}`);
 
-    // Send a message to the connection
+    // Send all initial items to the connection
     conn.send(JSON.stringify({ type: "initial_items", id: conn.id, items: this.items }));
+
+    // Send all initial cursors
+    conn.send(JSON.stringify({ type: "initial_cursors", cursors: this.cursors }));
 
     // this.room.broadcast(`${conn.id} has connected`);
     this.room.broadcast(JSON.stringify({ type: "connect", id: conn.id }));
@@ -81,8 +85,8 @@ class PartyServer {
     if (data.type !== "cursor") {
       console.log(data);
     }
-    // this.room.broadcast(JSON.stringify(data));
-    this.room.broadcast(JSON.stringify(data), [sender.id]);
+    this.room.broadcast(JSON.stringify(data));
+    // this.room.broadcast(JSON.stringify(data), [sender.id]);
   }
 }
 

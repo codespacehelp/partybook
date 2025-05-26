@@ -8,11 +8,23 @@
     </head>
     <body>
         <h1>partybook</h1>
-        <svg id="canvas" width="800" height="600" viewBox="0 0 800 600"></svg>
+        <div id="root"></div>
+        <!-- <svg id="canvas" width="800" height="600" viewBox="0 0 800 600"></svg> -->
 
         <button id="test-send">Send message</button>
         <div id="cursors"></div>
 
+        <script type="importmap">
+            {
+                "imports": {
+                    "partysocket": "https://esm.sh/partysocket",
+                    "preact": "https://esm.sh/preact",
+                    "preact/": "https://esm.sh/preact/",
+                    "@preact/signals": "https://esm.sh/@preact/signals",
+                    "htm": "https://esm.sh/htm"
+                }
+            }
+        </script>
         <script type="module" src="/static/editor.js"></script>
     </body>
 </html>
