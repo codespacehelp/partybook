@@ -39,22 +39,27 @@ function App() {
       } else if (message.type === "connect") {
       } else if (message.type === "disconnect") {
       } else if (message.type === "cursor") {
-        const newCursors = structuredClone(cursors);
-        let newCursor = newCursors.find((c) => c.id === message.id);
-        if (!newCursor) {
-          newCursor = { x: 0, y: 0 };
-          newCursors.push(newCursor);
-        }
-        newCursor.x = message.x;
-        newCursor.y = message.y;
-        setCursors(newCursors);
+        setCursors((prevCursors) => {
+          const newCursors = structuredClone(prevCursors);
+          let newCursor = newCursors.find((c) => c.id === message.id);
+          if (!newCursor) {
+            newCursor = { id: message.id, x: 0, y: 0 };
+            newCursors.push(newCursor);
+          }
+          newCursor.x = message.x;
+          newCursor.y = message.y;
+          return newCursors;
+        });
       } else if (message.type === "item_move") {
-        console.log(message);
-        const newItems = structuredClone(items);
-        const item = newItems.find((it) => it.id === message.id);
-        item.x = message.x;
-        item.y = message.y;
-        setItems(newItems);
+        setItems((prevItems) => {
+          const newItems = structuredClone(prevItems);
+          const item = newItems.find((it) => it.id === message.id);
+          if (item) {
+            item.x = message.x;
+            item.y = message.y;
+          }
+          return newItems;
+        });
       }
     });
 
@@ -67,17 +72,10 @@ function App() {
     });
   }, []);
 
-  function handleUpdateItem(item) {
-    const newItems = structuredClone(items);
-    const idx = newItems.findIndex((it) => it.id === item.id);
-    newItems[idx] = item;
-    setItems(newItems);
-  }
-
   function handleItemMouseDown(event, item) {
     setSelection([item.id]);
     startMousePositionRef.current = { x: event.clientX, y: event.clientY };
-    startItemPositionsRef.current = getSelectedItems().map((item) => ({ id: item.id, x: item.x, y: item.y }));
+    startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }];
     console.log(startMousePositionRef.current, startItemPositionsRef.current);
   }
 
@@ -88,17 +86,22 @@ function App() {
     const currentY = event.clientY;
     const deltaX = currentX - startX;
     const deltaY = currentY - startY;
-    const newItems = structuredClone(items);
-    for (const item of newItems) {
-      if (selection.includes(item.id)) {
-        const startPosition = startItemPositionsRef.current.find((pos) => pos.id === item.id);
-        item.x = startPosition.x + deltaX;
-        item.y = startPosition.y + deltaY;
-        // Tell PartyKit the item has moved.
-        wsRef.current.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
+
+    setItems((prevItems) => {
+      const newItems = structuredClone(prevItems);
+      for (const item of newItems) {
+        if (selection.includes(item.id)) {
+          const startPosition = startItemPositionsRef.current.find((pos) => pos.id === item.id);
+          if (startPosition) {
+            item.x = startPosition.x + deltaX;
+            item.y = startPosition.y + deltaY;
+            // Tell PartyKit the item has moved.
+            wsRef.current.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
+          }
+        }
       }
-    }
-    setItems(newItems);
+      return newItems;
+    });
   }
 
   return html`<svg width="800" height="600" viewBox="0 0 800 600">
@@ -106,7 +109,6 @@ function App() {
       if (item.type === "image") {
         return html`<${ImageItem}
           item=${item}
-          handleUpdateItem=${handleUpdateItem}
           handleItemMouseDown=${handleItemMouseDown}
           handleItemMouseDrag=${handleItemMouseDrag}
         />`;
