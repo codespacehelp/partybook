@@ -1,82 +1,112 @@
-import PartySocket from "https://esm.sh/partysocket";
+import PartySocket from "partysocket";
 import { h, render } from "preact";
-import { useState, useEffect, useRef, useMemo } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import htm from "htm";
+import { signal, computed } from "@preact/signals";
+
 const html = htm.bind(h);
 
+const items = signal([]);
+const cursors = signal([]);
+const selection = signal([]);
+
+// --- Actions (Mutate Signals Directly) ---
+function updateCursor(id, x, y) {
+  const newCursors = [...cursors.value]; // Create a new array to trigger update
+  let cursor = newCursors.find((c) => c.id === id);
+  if (!cursor) {
+    cursor = { id, x, y };
+    newCursors.push(cursor);
+  } else {
+    cursor.x = x;
+    cursor.y = y;
+  }
+  cursors.value = newCursors; // Update the signal's value
+}
+
+function moveItem(id, x, y) {
+  const newItems = [...items.value];
+  const item = newItems.find((it) => it.id === id);
+  if (item) {
+    item.x = x;
+    item.y = y;
+  }
+  items.value = newItems;
+}
+
+function moveSelectedItems(deltaX, deltaY, startPositions) {
+  const newItems = [...items.value];
+  for (const item of newItems) {
+    if (selection.value.includes(item.id)) {
+      const startPos = startPositions.find((pos) => pos.id === item.id);
+      if (startPos) {
+        item.x = startPos.x + deltaX;
+        item.y = startPos.y + deltaY;
+      }
+    }
+  }
+  items.value = newItems;
+}
+
+// --- Computed Signal (For Derived State) ---
+const selectedItems = computed(() =>
+  selection.value.map((id) => items.value.find((it) => it.id === id)).filter(Boolean),
+);
+
+// WebSocket instance outside of components
+let ws = null;
+
 function App() {
-  const [items, setItems] = useState([]);
-  const [cursors, setCursors] = useState([]);
-  const [selection, setSelection] = useState([]); // List of selected IDs
   const startMousePositionRef = useRef();
   const startItemPositionsRef = useRef();
-  const wsRef = useRef();
-
-  function getSelectedItems() {
-    return selection.map((id) => items.find((it) => it.id === id));
-  }
 
   useEffect(() => {
-    // Run this only once at the start.
-
-    // Initialize PartySocket
-    wsRef.current = new PartySocket({
-      // host: "project-name.username.partykit.dev",
+    ws = new PartySocket({
       host: "localhost:1999",
       room: "test",
-      // id: "sera"
     });
 
-    // Listen to messages
-    wsRef.current.addEventListener("message", (e) => {
+    ws.addEventListener("message", (e) => {
       const message = JSON.parse(e.data);
-      if (message.type === "initial_items") {
-        setItems(message.items);
-        console.log(message.items);
-      } else if (message.type === "initial_cursors") {
-        setCursors(message.cursors);
-        console.log(message.cursors);
-      } else if (message.type === "connect") {
-      } else if (message.type === "disconnect") {
-      } else if (message.type === "cursor") {
-        setCursors((prevCursors) => {
-          const newCursors = structuredClone(prevCursors);
-          let newCursor = newCursors.find((c) => c.id === message.id);
-          if (!newCursor) {
-            newCursor = { id: message.id, x: 0, y: 0 };
-            newCursors.push(newCursor);
-          }
-          newCursor.x = message.x;
-          newCursor.y = message.y;
-          return newCursors;
-        });
-      } else if (message.type === "item_move") {
-        setItems((prevItems) => {
-          const newItems = structuredClone(prevItems);
-          const item = newItems.find((it) => it.id === message.id);
-          if (item) {
-            item.x = message.x;
-            item.y = message.y;
-          }
-          return newItems;
-        });
+
+      switch (message.type) {
+        case "initial_items":
+          items.value = message.items; // Directly update signal
+          console.log(message.items);
+          break;
+        case "initial_cursors":
+          cursors.value = message.cursors; // Directly update signal
+          console.log(message.cursors);
+          break;
+        case "cursor":
+          updateCursor(message.id, message.x, message.y); // Use action
+          break;
+        case "item_move":
+          moveItem(message.id, message.x, message.y); // Use action
+          break;
       }
     });
 
-    // Start the connection
-    wsRef.current.reconnect();
+    ws.reconnect();
 
-    // Listen to mouse move events
-    window.addEventListener("mousemove", (e) => {
-      wsRef.current.send(JSON.stringify({ type: "cursor", id: wsRef.current.id, x: e.clientX, y: e.clientY }));
-    });
+    const handleMouseMove = (e) => {
+      ws.send(JSON.stringify({ type: "cursor", id: ws.id, x: e.clientX, y: e.clientY }));
+      // We don't need to update our own cursor locally with signals unless desired
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      ws.close();
+    };
   }, []);
 
   function handleItemMouseDown(event, item) {
-    setSelection([item.id]);
+    selection.value = [item.id];
+
     startMousePositionRef.current = { x: event.clientX, y: event.clientY };
     startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }];
-    console.log(startMousePositionRef.current, startItemPositionsRef.current);
   }
 
   function handleItemMouseDrag(event) {
@@ -87,33 +117,29 @@ function App() {
     const deltaX = currentX - startX;
     const deltaY = currentY - startY;
 
-    setItems((prevItems) => {
-      const newItems = structuredClone(prevItems);
-      for (const item of newItems) {
-        if (selection.includes(item.id)) {
-          const startPosition = startItemPositionsRef.current.find((pos) => pos.id === item.id);
-          if (startPosition) {
-            item.x = startPosition.x + deltaX;
-            item.y = startPosition.y + deltaY;
-            // Tell PartyKit the item has moved.
-            wsRef.current.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
-          }
-        }
-      }
-      return newItems;
+    moveSelectedItems(deltaX, deltaY, startItemPositionsRef.current);
+
+    // Send updates for each selected item (using the computed signal)
+    selectedItems.value.forEach((item) => {
+      ws.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
     });
   }
 
+  // --- Render (Access .value to use signals) ---
+  // Preact automatically subscribes and re-renders when signals change
   return html`<svg width="800" height="600" viewBox="0 0 800 600">
-    ${items.map((item) => {
+    ${items.value.map((item) => {
+      // Access .value here
       if (item.type === "image") {
         return html`<${ImageItem}
+          key=${item.id}
           item=${item}
           handleItemMouseDown=${handleItemMouseDown}
           handleItemMouseDrag=${handleItemMouseDrag}
         />`;
       }
     })}
+    ${cursors.value.map((cursor) => html`<circle cx=${cursor.x} cy=${cursor.y} r="5" fill="red" />`)}
   </svg>`;
 }
 
@@ -125,9 +151,6 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
   }
 
   function handleMouseDrag(event) {
-    // const newX = item.x + e.movementX;
-    // const newY = item.y + e.movementY;
-    // console.log(newX, newY);
     handleItemMouseDrag(event);
   }
 

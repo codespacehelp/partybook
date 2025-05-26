@@ -85,8 +85,8 @@ class PartyServer {
     if (data.type !== "cursor") {
       console.log(data);
     }
-    // this.room.broadcast(JSON.stringify(data));
-    this.room.broadcast(JSON.stringify(data), [sender.id]);
+    this.room.broadcast(JSON.stringify(data));
+    // this.room.broadcast(JSON.stringify(data), [sender.id]);
   }
 }
 
