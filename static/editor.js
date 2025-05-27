@@ -11,11 +11,20 @@ const cursors = signal([]);
 const selection = signal([]);
 
 // --- Actions (Mutate Signals Directly) ---
+function getRandomColor() {
+  const letters = "0123456789ABCDEF";
+  let color = "#";
+  for (let i = 0; i < 6; i++) {
+    color += letters[Math.floor(Math.random() * 16)];
+  }
+  return color;
+}
+
 function updateCursor(id, x, y) {
   const newCursors = [...cursors.value]; // Create a new array to trigger update
   let cursor = newCursors.find((c) => c.id === id);
   if (!cursor) {
-    cursor = { id, x, y };
+    cursor = { id, x, y, color: getRandomColor() };
     newCursors.push(cursor);
   } else {
     cursor.x = x;
@@ -139,7 +148,7 @@ function App() {
         />`;
       }
     })}
-    ${cursors.value.map((cursor) => html`<circle cx=${cursor.x} cy=${cursor.y} r="5" fill="red" />`)}
+    ${cursors.value.map((cursor) => html`<circle cx=${cursor.x} cy=${cursor.y} r="10" fill=${cursor.color} />`)}
   </svg>`;
 }
 
