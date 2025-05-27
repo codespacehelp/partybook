@@ -26,8 +26,8 @@ const DEFAULT_BOOK_ITEMS = [
     id: "def987",
     type: "image",
     url: "https://el0fpba1yn.ufs.sh/f/srNDdO9Sv6AutNKukhesuEVHvNgkKDIRm7JPy24SXp65hxUT",
-    x: 500,
-    y: 500,
+    x: 200,
+    y: 200,
   },
 ];
 
