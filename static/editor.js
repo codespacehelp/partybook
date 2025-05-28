@@ -11,6 +11,9 @@ const currentRoomId = signal("all-dreams-become-memes"); // Default room ID
 const items = signal([]);
 const cursors = signal([]);
 const selection = signal([]);
+const assets = signal([]);
+
+const UPLOADTHING_API_KEY = "";
 
 function getRandomColorFromId(id) {
   // Use only the first 6 hex characters of the id for the color
@@ -205,6 +208,80 @@ function TopicButton({ roomId, name }) {
   </button>`;
 }
 
+function AssetViewer() {
+  // Fetch asset list from UploadThing
+  async function fetchAssets() {
+    const res = await fetch("https://api.uploadthing.com/v6/listFiles", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-uploadthing-api-key": UPLOADTHING_API_KEY,
+      },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Map UploadThing file objects to your asset format
+      assets.value = data.files.map((f) => ({
+        id: f.key,
+        name: f.name,
+        type: f.type,
+        url: f.url, // You may need to adjust this depending on UploadThing's response
+      }));
+    }
+  }
+
+  // Handle file upload
+  async function uploadAsset() {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      // Prepare upload
+      const prepareRes = await fetch("https://api.uploadthing.com/v6/prepareUpload", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-uploadthing-api-key": UPLOADTHING_API_KEY,
+        },
+        body: JSON.stringify({
+          files: [{ name: file.name, type: file.type }],
+        }),
+      });
+      const prepareData = await prepareRes.json();
+      const { url, fileKey, uploadUrl, uploadHeaders } = prepareData[0];
+      // Upload file
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: uploadHeaders,
+        body: file,
+      });
+      // Optionally poll for completion or just refresh
+      await fetchAssets();
+    };
+    input.click();
+  }
+
+  // Fetch assets on mount
+  useEffect(() => {
+    fetchAssets();
+  }, []);
+
+  return html`<div class="p-4">
+    <h2 class="text-xl font-bold mb-4">Assets</h2>
+    <ul>
+      ${assets.value.map(
+        (item) =>
+          html`<li key=${item.id} class="mb-2"><span class="font-semibold">${item.name}</span> - ${item.type}</li>`
+      )}
+    </ul>
+    <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" onClick=${uploadAsset}>
+      Add Asset
+    </button>
+  </div>`;
+}
+
 function App() {
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-400">
@@ -216,7 +293,7 @@ function App() {
       </div>
     </div>
     <div id="workbench" class="flex-1 flex items-stretch">
-      <div id="assets" class="w-64 border-r-4 border-red-400"></div>
+      <div id="assets" class="w-64 border-r-4 border-red-400"><${AssetViewer} /></div>
       <div id="canvas" class="flex-1"><${Canvas} /></div>
     </div>
   </main> `;
