@@ -10,21 +10,19 @@ const items = signal([]);
 const cursors = signal([]);
 const selection = signal([]);
 
-// --- Actions (Mutate Signals Directly) ---
-function getRandomColor() {
-  const letters = "0123456789ABCDEF";
-  let color = "#";
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
-  }
-  return color;
+function getRandomColorFromId(id) {
+  // Use only the first 6 hex characters of the id for the color
+  let hex = id.replace(/[^a-fA-F0-9]/g, "").slice(0, 6);
+  // If not enough characters, pad with '0'
+  hex = hex.padEnd(6, "0");
+  return `#${hex}`;
 }
 
 function updateCursor(id, x, y) {
   const newCursors = [...cursors.value]; // Create a new array to trigger update
   let cursor = newCursors.find((c) => c.id === id);
   if (!cursor) {
-    cursor = { id, x, y, color: getRandomColor() };
+    cursor = { id, x, y, color: getRandomColorFromId(id) };
     newCursors.push(cursor);
   } else {
     cursor.x = x;
