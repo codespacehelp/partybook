@@ -57,7 +57,7 @@ function moveSelectedItems(deltaX, deltaY, startPositions) {
 
 // --- Computed Signal (For Derived State) ---
 const selectedItems = computed(() =>
-  selection.value.map((id) => items.value.find((it) => it.id === id)).filter(Boolean),
+  selection.value.map((id) => items.value.find((it) => it.id === id)).filter(Boolean)
 );
 
 // WebSocket instance outside of components
@@ -90,6 +90,10 @@ function App() {
           break;
         case "item_move":
           moveItem(message.id, message.x, message.y); // Use action
+          break;
+        case "disconnect":
+          // Remove the cursor for the disconnected user
+          cursors.value = cursors.value.filter((c) => c.id !== message.id);
           break;
       }
     });
