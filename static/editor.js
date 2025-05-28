@@ -55,6 +55,8 @@ function moveSelectedItems(deltaX, deltaY, startPositions) {
   items.value = newItems;
 }
 
+function changeTopic(roomId) {}
+
 // --- Computed Signal (For Derived State) ---
 const selectedItems = computed(() =>
   selection.value.map((id) => items.value.find((it) => it.id === id)).filter(Boolean)
@@ -63,7 +65,8 @@ const selectedItems = computed(() =>
 // WebSocket instance outside of components
 let ws = null;
 
-function App() {
+function Canvas() {
+  const svgRef = useRef(null);
   const startMousePositionRef = useRef();
   const startItemPositionsRef = useRef();
 
@@ -136,9 +139,11 @@ function App() {
     });
   }
 
+  const bounds = svgRef.current ? svgRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+
   // --- Render (Access .value to use signals) ---
   // Preact automatically subscribes and re-renders when signals change
-  return html`<svg width="800" height="600" viewBox="0 0 800 600">
+  return html`<svg width="800" height="600" viewBox="0 0 800 600" ref=${svgRef} class="cursor-none">
     ${items.value.map((item) => {
       // Access .value here
       if (item.type === "image") {
@@ -150,7 +155,16 @@ function App() {
         />`;
       }
     })}
-    ${cursors.value.map((cursor) => html`<circle cx=${cursor.x} cy=${cursor.y} r="10" fill=${cursor.color} />`)}
+    ${cursors.value.map(
+      (cursor) =>
+        html`<circle
+          cx=${cursor.x - bounds.left}
+          cy=${cursor.y - bounds.top}
+          r="10"
+          fill=${cursor.color}
+          class="pointer-events-none"
+        />`
+    )}
   </svg>`;
 }
 
@@ -170,7 +184,33 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
     window.removeEventListener("mouseup", handleMouseUp);
   }
 
-  return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} />`;
+  return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} class="select-none" />`;
+}
+
+function TopicButton({ roomId, name }) {
+  return html`<button
+    class="flex-1 h-16 border-r-4 border-red-400 flex items-center justify-center hover:bg-red-200"
+    onClick=${() => changeTopic(roomId)}
+  >
+    ${name}
+  </button>`;
+}
+
+function App() {
+  return html`<main class="flex flex-col h-screen">
+    <div id="header" class="flex items-center border-b-4 border-red-400">
+      <div class="w-64 h-16 border-r-4 border-red-400 flex items-center justify-center">Random Title Generator</div>
+      <div class="flex-1 h-16 flex items-center">
+        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes" />
+        <${TopicButton} roomId="beta" name="Beta" />
+        <${TopicButton} roomId="gamma" name="Gamma" />
+      </div>
+    </div>
+    <div id="workbench" class="flex-1 flex items-stretch">
+      <div id="assets" class="w-64 border-r-4 border-red-400"></div>
+      <div id="canvas" class="flex-1"><${Canvas} /></div>
+    </div>
+  </main> `;
 }
 
 render(html`<${App} />`, document.getElementById("root"));

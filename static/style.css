@@ -1,24 +1,10 @@
 body {
-    background: white;
+  background: white;
 }
 
 image {
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-}
-
-.cursor {
-    position: fixed;
-    font-size: 9px;
-    border: 1px solid red;
-    padding: 2px;
-    background-color: #eee;
-    color: red;
-}
-
-h1{
-    font-family: Georgia, 'Times New Roman', Times, serif;
-    color: red;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
