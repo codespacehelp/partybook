@@ -3,9 +3,11 @@ import { h, render } from "preact";
 import { useEffect, useRef } from "preact/hooks";
 import htm from "htm";
 import { signal, computed } from "@preact/signals";
+import clsx from "clsx";
 
 const html = htm.bind(h);
 
+const currentRoomId = signal("all-dreams-become-memes"); // Default room ID
 const items = signal([]);
 const cursors = signal([]);
 const selection = signal([]);
@@ -55,7 +57,9 @@ function moveSelectedItems(deltaX, deltaY, startPositions) {
   items.value = newItems;
 }
 
-function changeTopic(roomId) {}
+function changeTopic(roomId) {
+  currentRoomId.value = roomId;
+}
 
 // --- Computed Signal (For Derived State) ---
 const selectedItems = computed(() =>
@@ -71,9 +75,11 @@ function Canvas() {
   const startItemPositionsRef = useRef();
 
   useEffect(() => {
+    console.log("Opening WebSocket connection to room:", currentRoomId.value);
+
     ws = new PartySocket({
       host: "localhost:1999",
-      room: "test",
+      room: currentRoomId.value,
     });
 
     ws.addEventListener("message", (e) => {
@@ -112,9 +118,10 @@ function Canvas() {
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
+      console.log("Closing WebSocket connection");
       ws.close();
     };
-  }, []);
+  }, [currentRoomId.value]);
 
   function handleItemMouseDown(event, item) {
     selection.value = [item.id];
@@ -189,7 +196,9 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
 
 function TopicButton({ roomId, name }) {
   return html`<button
-    class="flex-1 h-16 border-r-4 border-red-400 flex items-center justify-center hover:bg-red-200"
+    class=${clsx("flex-1 h-16 border-r-4 border-red-400 flex items-center justify-center cursor-pointer", {
+      "bg-red-500": currentRoomId.value === roomId,
+    })}
     onClick=${() => changeTopic(roomId)}
   >
     ${name}
