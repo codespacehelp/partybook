@@ -310,7 +310,7 @@ function App() {
 
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-500">
-      <div class="w-80 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono">
+      <div class="w-80 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono text-2xl p-3">
         ${randomTitle}
       </div>
       <div class="flex-1 h-16 flex items-center text-red-500 font-mono">
