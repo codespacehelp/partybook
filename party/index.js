@@ -44,7 +44,8 @@ class PartyServer {
   }
 
   async onStart() {
-    this.items = (await this.room.storage.get("items")) ?? DEFAULT_BOOK_ITEMS;
+    this.items = (await this.room.storage.get("items")) ?? DEFAULT_BOOK_ITEMS; 
+    console.log(`Room ${this.room.id} started. Loaded ${this.items.length} items.`);
     this.cursors = [];
   }
 
@@ -75,18 +76,74 @@ class PartyServer {
   }
 
   /**
-   * @param {string} message
-   * @param {Connection} sender
+   * @param {string} message - The message received from a client.
+   * @param {Connection} sender - The connection object of the sender.
    */
-  onMessage(message, sender) {
-    // console.log(`connection ${sender.id} sent message: ${message}`);
-    // Broadcast the received message to all other connections in the room except the sender
+  async onMessage(message, sender) {
     const data = JSON.parse(message);
-    if (data.type !== "cursor") {
-      console.log(data);
+    // console.log(`Received message from ${sender.id}:`, data);
+
+    switch (data.type) {
+      case "cursor":
+        this.room.broadcast(JSON.stringify(data)); 
+        break;
+
+      case "item_move":
+        // Find the item in the current room state and update its position
+        let itemFound = false;
+        this.items = this.items.map((item) => {
+          if (item.id === data.id) {
+            itemFound = true;
+            return { ...item, x: data.x, y: data.y }; // Update x and y
+          }
+          return item;
+        });
+
+        // If the item wasn't found in the current state (e.g., a new item was added
+        // via a drag from the asset viewer, assuming the client sends enough info),
+        // add it to the items array.
+        // NOTE: For a robust system, you might want a separate "add_item" message
+        // that provides the full item data (id, type, url, initial x/y).
+        // This simplified approach assumes 'item_move' might implicitly add if not found.
+        if (!itemFound) {
+            console.warn(`Item with ID ${data.id} not found in room state. Adding it with received coordinates.`);
+            // You'll need more information (like 'type' and 'url') if this is a new item.
+            // For now, we'll make assumptions. Ideally, the client sends a full item object on 'add'.
+            this.items.push({
+                id: data.id,
+                x: data.x,
+                y: data.y,
+                type: "image", // Assuming it's an image. Client should provide this.
+                url: "https://placehold.co/100x100/aabbcc/ffffff?text=New+Item" // Placeholder. Client should provide this.
+            });
+        }
+
+        // Persist the updated items array to the room's storage
+        await this.room.storage.put("items", this.items);
+        console.log(`Item ${data.id} moved to (${data.x}, ${data.y}). State saved.`);
+
+        // Broadcast the updated item position to all clients in the room (including the sender)
+        // Broadcasting to sender ensures their UI is consistent with the server's authoritative state.
+        this.room.broadcast(JSON.stringify(data));
+        break;
+
+      // Add other message types here as needed (e.g., "add_item", "remove_item")
+      /*
+      case "add_item":
+        // Assuming data contains the full item object to add
+        this.items.push(data.item);
+        await this.room.storage.put("items", this.items);
+        this.room.broadcast(JSON.stringify({ type: "item_added", item: data.item }));
+        break;
+      */
+
+      default:
+        console.warn(`Unknown message type received: ${data.type}`);
+        // For any other unknown message type, you might still want to broadcast it
+        // or log it for debugging.
+        this.room.broadcast(JSON.stringify(data));
+        break;
     }
-    this.room.broadcast(JSON.stringify(data));
-    // this.room.broadcast(JSON.stringify(data), [sender.id]);
   }
 }
 
