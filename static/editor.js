@@ -199,8 +199,8 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
 
 function TopicButton({ roomId, name }) {
   return html`<button
-    class=${clsx("flex-1 h-16 border-r-4 border-red-400 flex items-center justify-center cursor-pointer", {
-      "bg-red-500": currentRoomId.value === roomId,
+    class=${clsx("flex-1 h-16 border-r-4 border-red-500 flex items-center justify-center cursor-pointer", {
+      "bg-red-500 text-white": currentRoomId.value === roomId,
     })}
     onClick=${() => changeTopic(roomId)}
   >
@@ -284,16 +284,16 @@ function AssetViewer() {
 
 function App() {
   return html`<main class="flex flex-col h-screen">
-    <div id="header" class="flex items-center border-b-4 border-red-400">
-      <div class="w-64 h-16 border-r-4 border-red-400 flex items-center justify-center">Random Title Generator</div>
-      <div class="flex-1 h-16 flex items-center">
-        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes" />
-        <${TopicButton} roomId="beta" name="Beta" />
-        <${TopicButton} roomId="gamma" name="Gamma" />
+    <div id="header" class="flex items-center border-b-4 border-red-500">
+      <div class="w-64 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center">Random Title Generator</div>
+      <div class="flex-1 h-16 flex items-center text-red-500">
+        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes"/>
+        <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" />
+        <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+c Is For Collectivity" />
       </div>
     </div>
     <div id="workbench" class="flex-1 flex items-stretch">
-      <div id="assets" class="w-64 border-r-4 border-red-400"><${AssetViewer} /></div>
+      <div id="assets" class="w-64 border-r-4 border-red-500"><${AssetViewer} /></div>
       <div id="canvas" class="flex-1"><${Canvas} /></div>
     </div>
   </main> `;
