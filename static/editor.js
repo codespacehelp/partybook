@@ -1,6 +1,6 @@
 import PartySocket from "partysocket";
 import { h, render } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks"; // Import useState
 import htm from "htm";
 import { signal, computed } from "@preact/signals";
 import clsx from "clsx";
@@ -14,6 +14,20 @@ const selection = signal([]);
 const assets = signal([]);
 
 const UPLOADTHING_API_KEY = "";
+
+// --- Title Generator Logic (Moved In-line) ---
+const M1 = ["MARGINS", "MAYBE", "MY", "MUST", "MARGINS", "MARGINS", "MY", "MORE", "MAKE"];
+const E1 = ["EMBRACE", "EVEN", "EXPOSING", "EAT", "ERASE", "ENJOY", "EXTEND", "EVADE", "ENTANGLE", "EGO", "EVERYTHING", "ETC", "EMANCIPATE", "ETHICS"];
+const M2 = ["MY", "MORE", "MEETS", "MAKE", "MARGINS", "MARGINS", "MARGINS"];
+const E2 = ["ERRORS", "EMPTY", "ETHICS", "EXPECTATIONS", "EDGES", "EXHAUSTION", "EMPATHY", "EXPLANATION", "EFFORT", "EVERYTHING", "ETHICS", "EUROS", "ETC", "ENDLESSLY", "EXPLODE"];
+
+function generateRandomTitle() {
+    const part1 = M1[Math.floor(Math.random() * M1.length)];
+    const part2 = E1[Math.floor(Math.random() * E1.length)];
+    const part3 = M2[Math.floor(Math.random() * M2.length)];
+    const part4 = E2[Math.floor(Math.random() * E2.length)];
+    return `${part1} ${part2} ${part3} ${part4}`;
+}
 
 function getRandomColorFromId(id) {
   // Use only the first 6 hex characters of the id for the color
@@ -226,7 +240,7 @@ function AssetViewer() {
         id: f.key,
         name: f.name,
         type: f.type,
-        url: f.url, // You may need to adjust this depending on UploadThing's response
+        url: f.url,
       }));
     }
   }
@@ -238,7 +252,6 @@ function AssetViewer() {
     input.onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      // Prepare upload
       const prepareRes = await fetch("https://api.uploadthing.com/v6/prepareUpload", {
         method: "POST",
         headers: {
@@ -251,13 +264,11 @@ function AssetViewer() {
       });
       const prepareData = await prepareRes.json();
       const { url, fileKey, uploadUrl, uploadHeaders } = prepareData[0];
-      // Upload file
       await fetch(uploadUrl, {
         method: "PUT",
         headers: uploadHeaders,
         body: file,
       });
-      // Optionally poll for completion or just refresh
       await fetchAssets();
     };
     input.click();
@@ -283,18 +294,34 @@ function AssetViewer() {
 }
 
 function App() {
+  const [randomTitle, setRandomTitle] = useState("");
+
+  useEffect(() => {
+    setRandomTitle(generateRandomTitle());
+
+    const intervalInMilliseconds = 0.1 * 60 * 1000; // 6 seconds
+    const intervalId = setInterval(() => {
+      setRandomTitle(generateRandomTitle());
+    }, intervalInMilliseconds);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, []); // Empty dependency array ensures this runs only once on mount
+
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-500">
-      <div class="w-64 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center">Random Title Generator</div>
-      <div class="flex-1 h-16 flex items-center text-red-500">
+      <div class="w-80 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono">
+        ${randomTitle}
+      </div>
+      <div class="flex-1 h-16 flex items-center text-red-500 font-mono">
         <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes"/>
         <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" />
         <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" />
       </div>
     </div>
     <div id="workbench" class="flex-1 flex items-stretch">
-      <div id="assets" class="w-64 border-r-4 border-red-500"><${AssetViewer} /></div>
-      <div id="canvas" class="flex-1"><${Canvas} /></div>
+      <div id="assets" class="w-80 border-r-4 border-red-500"><${AssetViewer}/></div>
+      <div id="canvas" class="flex-1"><${Canvas}/></div>
     </div>
   </main> `;
 }
