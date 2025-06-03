@@ -289,7 +289,7 @@ function App() {
       <div class="flex-1 h-16 flex items-center text-red-500">
         <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes"/>
         <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" />
-        <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+c Is For Collectivity" />
+        <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" />
       </div>
     </div>
     <div id="workbench" class="flex-1 flex items-stretch">
