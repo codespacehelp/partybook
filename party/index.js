@@ -152,14 +152,12 @@ class PartyServer {
         break;
 
       // Add other message types here as needed (e.g., "add_item", "remove_item")
-      /*
       case "add_item":
         // Assuming data contains the full item object to add
         this.items.push(data.item);
         await this.room.storage.put("items", this.items);
-        this.room.broadcast(JSON.stringify({ type: "item_added", item: data.item }));
+        this.room.broadcast(JSON.stringify({ type: "add_item", item: data.item }));
         break;
-      */
 
       default:
         console.warn(`Unknown message type received: ${data.type}`);

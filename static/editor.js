@@ -167,6 +167,9 @@ function Canvas() {
         case "upload":
           assets.value = [...assets.value, { id: message.id, url: message.url, name: message.name }];
           break;
+        case "add_item":
+          items.value = [...items.value, message.item];
+          break;
       }
     });
 
@@ -299,12 +302,33 @@ function AssetViewer() {
     }
   }
 
+  // Handle asset click: add to canvas and broadcast
+  function handleAssetClick(asset) {
+    // Generate a unique ID for the new item
+    const newId = `${asset.id}-${Date.now()}`;
+    // Default position (center-ish)
+    const x = 400;
+    const y = 300;
+    const newItem = {
+      id: newId,
+      type: "image",
+      url: asset.url,
+      x,
+      y,
+      name: asset.name,
+    };
+    // Locally add to items (for immediate feedback)
+    items.value = [...items.value, newItem];
+    // Send to server so all clients get it
+    ws.send(JSON.stringify({ type: "add_item", item: newItem }));
+  }
+
   return html`<div class="p-4 overflow-hidden flex flex-col">
     <h2 class="text-xl font-bold mb-4">Assets</h2>
     <ul class="flex-1 overflow-auto">
       ${assets.value.map(
         (item) =>
-          html`<li key=${item.id} class="mb-2">
+          html`<li key=${item.id} class="mb-2 cursor-pointer" onClick=${() => handleAssetClick(item)}>
             <span class="font-semibold">${item.name}</span><img src=${item.url} />
           </li>`,
       )}
