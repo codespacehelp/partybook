@@ -12,8 +12,11 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
     "express": "^5.1.0",
-    "partykit": "0.0.114"
+    "partykit": "0.0.114",
+    "uploadthing": "^7.7.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

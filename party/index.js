@@ -44,9 +44,30 @@ class PartyServer {
   }
 
   async onStart() {
-    this.items = (await this.room.storage.get("items")) ?? DEFAULT_BOOK_ITEMS; 
+    this.items = (await this.room.storage.get("items")) ?? DEFAULT_BOOK_ITEMS;
     console.log(`Room ${this.room.id} started. Loaded ${this.items.length} items.`);
     this.cursors = [];
+
+    this.assets = await this.listAssets();
+  }
+
+  async listAssets() {
+    const targetUrl = "https://api.uploadthing.com/v6/listFiles";
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Uploadthing-Api-Key": process.env.UPLOADTHING_SECRET_KEY,
+    };
+    const requestBody = JSON.stringify({});
+    const res = await fetch(targetUrl, { method: "POST", headers, body: requestBody });
+    if (!res.ok) {
+      const errorText = await response.text();
+      console.error(`Uploadthing API request failed with status ${response.status}: ${errorText}`);
+      return [];
+    }
+    const data = await res.json();
+    const urlPrefix = "https://el0fpba1yn.ufs.sh/f";
+    const assets = data.files.map((file) => ({ id: file.id, name: file.name, url: `${urlPrefix}/${file.key}` }));
+    return assets;
   }
 
   /**
@@ -62,6 +83,9 @@ class PartyServer {
 
     // Send all initial cursors
     conn.send(JSON.stringify({ type: "initial_cursors", cursors: this.cursors }));
+
+    // Send all initial cursors
+    conn.send(JSON.stringify({ type: "initial_assets", assets: this.assets }));
 
     // this.room.broadcast(`${conn.id} has connected`);
     this.room.broadcast(JSON.stringify({ type: "connect", id: conn.id }));
@@ -85,7 +109,7 @@ class PartyServer {
 
     switch (data.type) {
       case "cursor":
-        this.room.broadcast(JSON.stringify(data)); 
+        this.room.broadcast(JSON.stringify(data));
         break;
 
       case "item_move":
@@ -106,16 +130,16 @@ class PartyServer {
         // that provides the full item data (id, type, url, initial x/y).
         // This simplified approach assumes 'item_move' might implicitly add if not found.
         if (!itemFound) {
-            console.warn(`Item with ID ${data.id} not found in room state. Adding it with received coordinates.`);
-            // You'll need more information (like 'type' and 'url') if this is a new item.
-            // For now, we'll make assumptions. Ideally, the client sends a full item object on 'add'.
-            this.items.push({
-                id: data.id,
-                x: data.x,
-                y: data.y,
-                type: "image", // Assuming it's an image. Client should provide this.
-                url: "https://placehold.co/100x100/aabbcc/ffffff?text=New+Item" // Placeholder. Client should provide this.
-            });
+          console.warn(`Item with ID ${data.id} not found in room state. Adding it with received coordinates.`);
+          // You'll need more information (like 'type' and 'url') if this is a new item.
+          // For now, we'll make assumptions. Ideally, the client sends a full item object on 'add'.
+          this.items.push({
+            id: data.id,
+            x: data.x,
+            y: data.y,
+            type: "image", // Assuming it's an image. Client should provide this.
+            url: "https://placehold.co/100x100/aabbcc/ffffff?text=New+Item", // Placeholder. Client should provide this.
+          });
         }
 
         // Persist the updated items array to the room's storage

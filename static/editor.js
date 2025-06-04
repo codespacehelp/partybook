@@ -4,8 +4,16 @@ import { useEffect, useRef, useState } from "preact/hooks"; // Import useState
 import htm from "htm";
 import { signal, computed } from "@preact/signals";
 import clsx from "clsx";
+import { generateMimeTypes, generatePermittedFileTypes, genUploader } from "uploadthing/client";
 
 const html = htm.bind(h);
+
+const BASE_URL = "http://localhost:3000";
+
+export const { uploadFiles, createUpload } = genUploader({
+  url: BASE_URL,
+  package: "vanilla",
+});
 
 const currentRoomId = signal("all-dreams-become-memes"); // Default room ID
 const items = signal([]);
@@ -17,16 +25,47 @@ const UPLOADTHING_API_KEY = "";
 
 // --- Title Generator Logic (Moved In-line) ---
 const M1 = ["MARGINS", "MAYBE", "MY", "MUST", "MARGINS", "MARGINS", "MY", "MORE", "MAKE"];
-const E1 = ["EMBRACE", "EVEN", "EXPOSING", "EAT", "ERASE", "ENJOY", "EXTEND", "EVADE", "ENTANGLE", "EGO", "EVERYTHING", "ETC", "EMANCIPATE", "ETHICS"];
+const E1 = [
+  "EMBRACE",
+  "EVEN",
+  "EXPOSING",
+  "EAT",
+  "ERASE",
+  "ENJOY",
+  "EXTEND",
+  "EVADE",
+  "ENTANGLE",
+  "EGO",
+  "EVERYTHING",
+  "ETC",
+  "EMANCIPATE",
+  "ETHICS",
+];
 const M2 = ["MY", "MORE", "MEETS", "MAKE", "MARGINS", "MARGINS", "MARGINS"];
-const E2 = ["ERRORS", "EMPTY", "ETHICS", "EXPECTATIONS", "EDGES", "EXHAUSTION", "EMPATHY", "EXPLANATION", "EFFORT", "EVERYTHING", "ETHICS", "EUROS", "ETC", "ENDLESSLY", "EXPLODE"];
+const E2 = [
+  "ERRORS",
+  "EMPTY",
+  "ETHICS",
+  "EXPECTATIONS",
+  "EDGES",
+  "EXHAUSTION",
+  "EMPATHY",
+  "EXPLANATION",
+  "EFFORT",
+  "EVERYTHING",
+  "ETHICS",
+  "EUROS",
+  "ETC",
+  "ENDLESSLY",
+  "EXPLODE",
+];
 
 function generateRandomTitle() {
-    const part1 = M1[Math.floor(Math.random() * M1.length)];
-    const part2 = E1[Math.floor(Math.random() * E1.length)];
-    const part3 = M2[Math.floor(Math.random() * M2.length)];
-    const part4 = E2[Math.floor(Math.random() * E2.length)];
-    return `${part1} ${part2} ${part3} ${part4}`;
+  const part1 = M1[Math.floor(Math.random() * M1.length)];
+  const part2 = E1[Math.floor(Math.random() * E1.length)];
+  const part3 = M2[Math.floor(Math.random() * M2.length)];
+  const part4 = E2[Math.floor(Math.random() * E2.length)];
+  return `${part1} ${part2} ${part3} ${part4}`;
 }
 
 function getRandomColorFromId(id) {
@@ -80,7 +119,7 @@ function changeTopic(roomId) {
 
 // --- Computed Signal (For Derived State) ---
 const selectedItems = computed(() =>
-  selection.value.map((id) => items.value.find((it) => it.id === id)).filter(Boolean)
+  selection.value.map((id) => items.value.find((it) => it.id === id)).filter(Boolean),
 );
 
 // WebSocket instance outside of components
@@ -111,6 +150,10 @@ function Canvas() {
           cursors.value = message.cursors; // Directly update signal
           console.log(message.cursors);
           break;
+        case "initial_assets":
+          assets.value = message.assets;
+          console.log("assets", message.cursors);
+          break;
         case "cursor":
           updateCursor(message.id, message.x, message.y); // Use action
           break;
@@ -120,6 +163,9 @@ function Canvas() {
         case "disconnect":
           // Remove the cursor for the disconnected user
           cursors.value = cursors.value.filter((c) => c.id !== message.id);
+          break;
+        case "upload":
+          assets.value = [...assets.value, { id: message.id, url: message.url, name: message.name }];
           break;
       }
     });
@@ -187,7 +233,7 @@ function Canvas() {
           r="10"
           fill=${cursor.color}
           class="pointer-events-none"
-        />`
+        />`,
     )}
   </svg>`;
 }
@@ -223,73 +269,50 @@ function TopicButton({ roomId, name }) {
 }
 
 function AssetViewer() {
-  // Fetch asset list from UploadThing
-  async function fetchAssets() {
-    const res = await fetch("https://api.uploadthing.com/v6/listFiles", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-uploadthing-api-key": UPLOADTHING_API_KEY,
-      },
-      body: JSON.stringify({}),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      // Map UploadThing file objects to your asset format
-      assets.value = data.files.map((f) => ({
-        id: f.key,
-        name: f.name,
-        type: f.type,
-        url: f.url,
-      }));
+  const formRef = useRef();
+  const fileInputRef = useRef();
+
+  // Handle file upload
+  async function handleUpload(e) {
+    e.preventDefault();
+    const fileInput = fileInputRef.current;
+    console.log(fileInput);
+    const files = Array.from(fileInput.files || []);
+    console.log(files);
+    try {
+      const res = await uploadFiles((routeRegistry) => routeRegistry.imageUploader, {
+        files,
+        //signal: ac.signal,
+        // onUploadProgress: ({ totalProgress }) => {
+        //   progressBar.value = totalProgress;
+        // },
+      });
+      console.log(res);
+
+      for (const file of res) {
+        ws.send(JSON.stringify({ type: "upload", id: file.key, url: file.ufsUrl, name: file.name }));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      formRef.current.reset();
     }
   }
 
-  // Handle file upload
-  async function uploadAsset() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.onchange = async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const prepareRes = await fetch("https://api.uploadthing.com/v6/prepareUpload", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-uploadthing-api-key": UPLOADTHING_API_KEY,
-        },
-        body: JSON.stringify({
-          files: [{ name: file.name, type: file.type }],
-        }),
-      });
-      const prepareData = await prepareRes.json();
-      const { url, fileKey, uploadUrl, uploadHeaders } = prepareData[0];
-      await fetch(uploadUrl, {
-        method: "PUT",
-        headers: uploadHeaders,
-        body: file,
-      });
-      await fetchAssets();
-    };
-    input.click();
-  }
-
-  // Fetch assets on mount
-  useEffect(() => {
-    fetchAssets();
-  }, []);
-
-  return html`<div class="p-4">
+  return html`<div class="p-4 overflow-hidden flex flex-col">
     <h2 class="text-xl font-bold mb-4">Assets</h2>
-    <ul>
+    <ul class="flex-1 overflow-auto">
       ${assets.value.map(
         (item) =>
-          html`<li key=${item.id} class="mb-2"><span class="font-semibold">${item.name}</span> - ${item.type}</li>`
+          html`<li key=${item.id} class="mb-2">
+            <span class="font-semibold">${item.name}</span><img src=${item.url} />
+          </li>`,
       )}
     </ul>
-    <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" onClick=${uploadAsset}>
-      Add Asset
-    </button>
+    <form ref=${formRef} onSubmit=${handleUpload}>
+      <input type="file" ref=${fileInputRef} />
+      <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" type="submit">Upload</button>
+    </form>
   </div>`;
 }
 
@@ -310,18 +333,20 @@ function App() {
 
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-500">
-      <div class="w-80 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono text-2xl p-3">
+      <div
+        class="w-80 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono text-2xl p-3"
+      >
         ${randomTitle}
       </div>
       <div class="flex-1 h-16 flex items-center text-red-500 font-mono">
-        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes"/>
+        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes" />
         <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" />
         <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" />
       </div>
     </div>
     <div id="workbench" class="flex-1 flex items-stretch">
-      <div id="assets" class="w-80 border-r-4 border-red-500"><${AssetViewer}/></div>
-      <div id="canvas" class="flex-1"><${Canvas}/></div>
+      <div id="assets" class="w-80 border-r-4 border-red-500"><${AssetViewer} /></div>
+      <div id="canvas" class="flex-1"><${Canvas} /></div>
     </div>
   </main> `;
 }
