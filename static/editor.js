@@ -326,7 +326,8 @@ function AssetViewer() {
   return html`<div class="p-4 overflow-hidden flex flex-col">
     <h2 class="text-xl font-bold mb-4">Assets</h2>
     <ul class="flex-1 overflow-auto">
-      ${assets.value.map(
+      ${assets.value &&
+      assets.value.map(
         (item) =>
           html`<li key=${item.id} class="mb-2 cursor-pointer" onClick=${() => handleAssetClick(item)}>
             <span class="font-semibold">${item.name}</span><img src=${item.url} />
