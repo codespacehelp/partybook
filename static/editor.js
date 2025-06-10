@@ -325,16 +325,16 @@ function AssetViewer() {
 
   return html`<div class="p-4 overflow-hidden flex flex-col">
     <h2 class="text-xl font-mono mb-4">Assets</h2>
-    <form ref=${formRef} onSubmit=${handleUpload}>
-      <input type="file" ref=${fileInputRef} />
-      <button class="mt-4 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500" type="submit">Upload</button>
+    <form class="uppercase" ref=${formRef} onSubmit=${handleUpload}>
+      <input class="font-mono uppercase cursor-pointer" type="file" ref=${fileInputRef} />
+      <button class="cursor-pointer mt-4 mb-8 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500" type="submit">Upload</button>
     </form>
     <ul class="flex-1 overflow-auto">
       ${assets.value &&
       assets.value.map(
         (item) =>
           html`<li key=${item.id} class="mb-2 cursor-pointer" onClick=${() => handleAssetClick(item)}>
-            <span class="font-semibold">${item.name}</span><img src=${item.url} />
+            <span class="font-mono text-xs uppercase">${item.name}</span><img src=${item.url} class="w-20" />
           </li>`,
       )}
     </ul>
@@ -360,7 +360,7 @@ function App() {
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-500">
       <div
-        class="w-100 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono text-2xl p-3"
+        class="w-100 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-2xl p-3"
       >
         ${randomTitle}
       </div>
