@@ -324,7 +324,11 @@ function AssetViewer() {
   }
 
   return html`<div class="p-4 overflow-hidden flex flex-col">
-    <h2 class="text-xl font-bold mb-4">Assets</h2>
+    <h2 class="text-xl font-mono mb-4">Assets</h2>
+    <form ref=${formRef} onSubmit=${handleUpload}>
+      <input type="file" ref=${fileInputRef} />
+      <button class="mt-4 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500" type="submit">Upload</button>
+    </form>
     <ul class="flex-1 overflow-auto">
       ${assets.value &&
       assets.value.map(
@@ -334,10 +338,7 @@ function AssetViewer() {
           </li>`,
       )}
     </ul>
-    <form ref=${formRef} onSubmit=${handleUpload}>
-      <input type="file" ref=${fileInputRef} />
-      <button class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" type="submit">Upload</button>
-    </form>
+    
   </div>`;
 }
 
@@ -359,7 +360,7 @@ function App() {
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-500">
       <div
-        class="w-80 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono text-2xl p-3"
+        class="w-100 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-center font-mono text-2xl p-3"
       >
         ${randomTitle}
       </div>
@@ -369,8 +370,8 @@ function App() {
         <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" />
       </div>
     </div>
-    <div id="workbench" class="flex-1 flex items-stretch">
-      <div id="assets" class="w-80 border-r-4 border-red-500"><${AssetViewer} /></div>
+    <div id="workbench" class="flex-1 flex items-stretch text-red-500">
+      <div id="assets" class="w-100 border-r-4 border-red-500"><${AssetViewer} /></div>
       <div id="canvas" class="flex-1"><${Canvas} /></div>
     </div>
   </main> `;
