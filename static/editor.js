@@ -170,6 +170,9 @@ function Canvas() {
         case "add_item":
           items.value = [...items.value, message.item];
           break;
+        case "delete_item":
+          items.value = items.value.filter((item) => item.id !==messageid);
+          break;
       }
     });
 
@@ -212,6 +215,15 @@ function Canvas() {
     });
   }
 
+  function handleDeleteItem(itemId) {
+    // Optimistic update: remove locally first for immediate feedback
+    items.value = items.value.filter((item) => item.id !== itemId);
+    // Send message to PartyKit server to notify other clients
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "delete_item", id: itemId }));
+    }
+  }
+
   const bounds = svgRef.current ? svgRef.current.getBoundingClientRect() : { left: 0, top: 0 };
 
   // --- Render (Access .value to use signals) ---
@@ -225,6 +237,7 @@ function Canvas() {
           item=${item}
           handleItemMouseDown=${handleItemMouseDown}
           handleItemMouseDrag=${handleItemMouseDrag}
+          handleDeleteItem=${handleDeleteItem}
         />`;
       }
     })}
@@ -241,7 +254,7 @@ function Canvas() {
   </svg>`;
 }
 
-function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
+function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDeleteItem }) {
   function handleMouseDown(event) {
     handleItemMouseDown(event, item);
     window.addEventListener("mousemove", handleMouseDrag);
@@ -257,7 +270,12 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag }) {
     window.removeEventListener("mouseup", handleMouseUp);
   }
 
-  return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} class="select-none" />`;
+  function handleDoubleClick(event) {
+    event.stopPropagation(); // Prevent canvas drag from triggering
+    handleDeleteItem(item.id);
+  }
+
+  return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} onDblClick=${handleDoubleClick} class="select-none" />`;
 }
 
 function TopicButton({ roomId, name }) {
