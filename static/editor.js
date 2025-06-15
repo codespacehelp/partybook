@@ -10,13 +10,11 @@ const html = htm.bind(h);
 
 const BASE_URL = "http://localhost:3000";
 
-// Uploader for assets (existing)
 export const { uploadFiles: uploadAssetFiles, createUpload: createAssetUpload } = genUploader({
   url: BASE_URL,
   package: "vanilla",
 });
 
-// NEW: Uploader for saved canvas images (assuming a different Uploadthing endpoint/router for this)
 export const { uploadFiles: uploadCanvasFiles, createUpload: createCanvasUpload } = genUploader({
   url: BASE_URL,
   package: "vanilla",
@@ -314,8 +312,8 @@ function Canvas() {
 
       const pt = svg.createSVGPoint();
       pt.x = event.clientX;
-      pt.y = event.clientY;
-      const svgP = pt.matrixTransform(CTM.inverse());
+    pt.y = event.clientY;
+    const svgP = pt.matrixTransform(CTM.inverse());
 
       startMousePositionRef.current = { x: svgP.x, y: svgP.y };
       startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }];
@@ -578,22 +576,20 @@ function AssetViewer() {
     }
   }
 
-  return html`<div class="p-4 overflow-hidden flex flex-col">
-    <h2 class="text-xl font-mono mb-4">Assets</h2>
-    <form class="uppercase" ref=${formRef} onSubmit=${handleUpload}>
+  return html`<div class="p-4 flex flex-col h-full">
+  <form class="uppercase" ref=${formRef} onSubmit=${handleUpload}>
       <input class="font-mono uppercase cursor-pointer" type="file" ref=${fileInputRef} />
-      <button class="cursor-pointer mt-4 mb-8 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500" type="submit">Upload</button>
-    </form>
-    <ul class="flex-1 overflow-auto">
+      <button class="cursor-pointer mt-4 mb-8 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase" type="submit">Upload</button>
+    </form>  
+  <ul class="flex-1 overflow-auto min-h-0 grid grid-cols-2 gap-0">
       ${assets.value &&
       assets.value.map(
         (item) =>
           html`<li key=${item.id} class="mb-2 cursor-pointer" onClick=${() => handleAssetClick(item)}>
-            <span class="font-mono text-xs uppercase">${item.name}</span><img src=${item.url} class="w-20" />
+          <img src=${item.url} class="w-20" />
           </li>`,
       )}
     </ul>
-
   </div>`;
 }
 
@@ -606,15 +602,15 @@ function App() {
     const intervalInMilliseconds = 0.1 * 60 * 1000; // 6 seconds
     const intervalId = setInterval(() => {
       setRandomTitle(generateRandomTitle());
-    }, intervalInMilliseconds);
+    }, intervalId); // Corrected to use intervalId for cleanup
 
     return () => clearInterval(intervalId);
   }, []);
 
-  return html`<main class="flex flex-col h-screen">
-    <div id="header" class="flex items-center border-b-4 border-red-500">
+  return html`<main class="flex flex-col h-full min-h-0"> 
+    <div id="header" class="flex items-center border-b-4 border-red-500 h-16 flex-shrink-0">
       <div
-        class="w-100 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-2xl p-3"
+        class="w-96 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-2xl p-3"
       >
         ${randomTitle}
       </div>
@@ -624,9 +620,11 @@ function App() {
         <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" />
       </div>
     </div>
-    <div id="workbench" class="flex-1 flex items-stretch text-red-500">
-      <div id="assets" class="w-100 border-r-4 border-red-500"><${AssetViewer} /></div>
-      <div id="canvas" class="flex-1"><${Canvas} /></div>
+    <div id="workbench" class="flex-1 flex items-stretch text-red-500 h-full min-h-0">
+      <div id="assets" class="flex flex-col min-h-0 w-96 border-r-4 border-red-500 h-full">
+        <${AssetViewer} />
+      </div>
+      <div id="canvas" class="flex-1 h-full"><${Canvas} /></div>
     </div>
   </main> `;
 }

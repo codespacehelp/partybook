@@ -8,3 +8,27 @@ image {
   -moz-user-select: none;
   -ms-user-select: none;
 }
+
+html, body, #root {
+    height: 100%; /* Make html and body fill the entire viewport height */
+    margin: 0;    /* Remove default margins */
+    padding: 0;   /* Remove default paddings */
+}
+
+body {
+    /* Crucial: Prevent the body from showing scrollbars.
+        This forces child elements with `overflow-auto` to scroll instead. */
+    overflow: hidden; 
+}
+
+#assets {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.asset-list {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+}
