@@ -510,7 +510,7 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDelet
     href=${item.url}
     onMouseDown=${handleMouseDown}
     onDblClick=${handleDoubleClick}
-    class="select-none cursor-pointer" />`;
+    class="select-none" />`;
 }
 
 function TopicButton({ roomId, name }) {
