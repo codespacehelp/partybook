@@ -718,9 +718,9 @@ function App() {
   Welcome to the <i>What Are We Doing Here?</i> 'M E M E -MAKER'!<br/><br/>
     Feel free to use this tool and your intuition to combine and create images (or memes, if you will). Hover over the ever-changing title and the different topics at the top of the screen to read small introductions on each of them, and let those lead you on your image-making adventures.<br/><br/>
     - Click on a topic to switch to the according canvas.<br/>
-    - Click on the images in the asset viewer to add them to the canvas.<br/>
+    - Click on an image in the asset viewer on the left to add it to the canvas.<br/>
     - Drag the images around to position them.<br/>
-    - Resize the images by dragging the red square in the bottom right corner.<br/>
+    - Resize the images by dragging the red square in their bottom right corner.<br/>
     - Double-click an image to delete it.<br/>
     - Use the "CLEAR" button to remove all images from the canvas.<br/><br/> 
     Once you’re happy, click "SAVE". This sends your creation to a public folder which will serve as a collaborative open-source collection of 'memes' on the topic of graphic design for/against the world. Once enough memes have been added, they will be collected and printed as a third edition of the <i>What Are We Doing Here?</i> series. <br/><br/>
