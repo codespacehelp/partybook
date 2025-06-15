@@ -475,21 +475,23 @@ function Canvas() {
         />`,
     )}
     </svg>
-    <div class="absolute bottom-4 right-4 flex flex-col items-end space-y-2">
-      <button
-        class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase"
-        onClick=${handleSaveCanvas}
-        disabled=${isSaving}
-      >
-        ${isSaving ? 'Saving...' : 'Save Canvas'}
-      </button>
-      <button
-        class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase"
-        onClick=${handleClearCanvas}
-      >
-        Clear Canvas
-      </button>
-      ${saveMessage && html`<div class="text-red-500 font-mono text-sm">${saveMessage}</div>`}
+    <div class="absolute bottom-4 right-4 flex flex-col items-end">
+      ${saveMessage && html`<div class="text-red-500 font-mono text-sm mb-2">${saveMessage}</div>`}
+      <div class="flex flex-row space-x-2">
+        <button
+          class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase hover:cursor-pointer"
+          onClick=${handleClearCanvas}
+        >
+          Clear
+        </button>
+        <button
+          class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase hover:cursor-pointer"
+          onClick=${handleSaveCanvas}
+          disabled=${isSaving}
+        >
+          ${isSaving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
     </div>
   </div>`;
 }
