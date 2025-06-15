@@ -55,7 +55,7 @@ class PartyServer {
     const targetUrl = "https://api.uploadthing.com/v6/listFiles";
     const headers = {
       "Content-Type": "application/json",
-      "X-Uploadthing-Api-Key": process.env.UPLOADTHING_SECRET_KEY,
+      "X-Uploadthing-Api-Key": this.room.env.UPLOADTHING_SECRET_KEY,
     };
     const requestBody = JSON.stringify({});
     const res = await fetch(targetUrl, { method: "POST", headers, body: requestBody });
