@@ -517,7 +517,7 @@ function Canvas({showHelp, setShowHelp, helpText}) {
     </svg>
     <div class="absolute top-4 right-4 flex flex-col items-end z-30">
       <button
-        class="w-10 h-10 flex items-center justify-center rounded-full bg-red-500 text-white font-mono text-2xl border-2 border-red-500 shadow hover:bg-white hover:text-red-500 transition-colors"
+        class="w-10 h-10 flex items-center justify-center rounded-full bg-red-500 text-white font-mono text-sm border-2 border-red-500 hover:bg-white hover:text-red-500 transition-colors"
         onClick=${() => setShowHelp((v) => !v)}
         aria-label="Show help"
         style="z-index:1100;"
@@ -538,16 +538,16 @@ function Canvas({showHelp, setShowHelp, helpText}) {
       `}
     </div>
     <div class="absolute bottom-4 right-4 flex flex-col items-end z-20">
-      ${saveMessage && html`<div class="text-red-500 font-mono text-sm mb-2">${saveMessage}</div>`}
+      ${saveMessage && html`<div class="text-red-500 font-mono text-xs mb-2">${saveMessage}</div>`}
       <div class="flex flex-row space-x-2">
         <button
-          class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase hover:cursor-pointer"
+          class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 text-sm border-2 border-red-500 uppercase hover:cursor-pointer"
           onClick=${handleClearCanvas}
         >
           Clear
         </button>
         <button
-          class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase hover:cursor-pointer"
+          class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 text-sm border-2 border-red-500 uppercase hover:cursor-pointer"
           onClick=${handleSaveCanvas}
           disabled=${isSaving}
         >
@@ -600,7 +600,7 @@ const TOPIC_INTROS = {
 
 function TopicButton({ roomId, name, onHover }) {
   return html`<button
-    class=${clsx("flex-1 h-16 border-r-4 border-red-500 flex items-center justify-center cursor-pointer", {
+    class=${clsx("flex-1 h-12 border-r-4 border-red-500 flex items-center justify-center cursor-pointer", {
       "bg-red-500 text-white": currentRoomId.value === roomId,
     })}
     onMouseEnter=${(e) => onHover(roomId, e)}
@@ -668,7 +668,7 @@ function AssetViewer() {
 
   return html`<div class="p-4 flex flex-col h-full">
   
-  <ul class="flex-1 overflow-auto min-h-0 grid grid-cols-2 gap-0">
+  <ul class="flex-1 overflow-auto min-h-0 grid grid-cols-2 gap-4">
       ${assets.value &&
       assets.value.map(
         (item) =>
@@ -720,7 +720,7 @@ function App() {
   }
 
   const helpText = html`
-  <div> 
+  <div class="text-sm"> 
   Welcome to the <i>What Are We Doing Here?</i> 'M E M E -MAKER'!<br/><br/>
     Feel free to use this tool and your intuition to combine and create images (or memes, if you will). Hover over the ever-changing title and the different topics at the top of the screen to read small introductions on each of them, and let those lead you on your image-making adventures.<br/><br/>
     - Click on a topic to switch to the according canvas.<br/>
@@ -737,9 +737,9 @@ function App() {
   
 
   return html`<main class="flex flex-col h-full min-h-0"> 
-    <div id="header" class="flex items-center border-b-4 border-red-500 h-16 flex-shrink-0 relative">
+    <div id="header" class="flex items-center border-b-4 border-red-500 h-12 flex-shrink-0 relative">
       <div
-        class="w-96 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-2xl p-3"
+        class="w-64 h-12 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-lg/5 p-3"
         onMouseEnter=${handleTitleHover}
         onMouseMove=${handleTitleHover}
         onMouseLeave=${() => handleTitleHover(null)}
@@ -747,7 +747,7 @@ function App() {
         >
         ${randomTitle}
       </div>
-      <div class="flex-1 h-16 flex items-center text-red-500 font-mono">
+      <div class="flex-1 h-12 flex items-center text-red-500 font-mono text-sm">
         <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes" onHover=${handleTopicHover} />
         <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" onHover=${handleTopicHover} />
         <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" onHover=${handleTopicHover} />
@@ -778,11 +778,11 @@ function App() {
           }}
           class="bg-white text-red-500 border-2 border-red-500 rounded px-4 py-2 font-mono text-sm shadow"
         >
-          A meme (/miːm/ ⓘ; MEEM)[1][2][3] is an idea, behavior, or style that spreads by means of imitation from person to person within a culture and often carries symbolic meaning representing a particular phenomenon or theme.[4] A meme acts as a unit for carrying cultural ideas, symbols, or practices, that can be transmitted from one mind to another through writing, speech, gestures, rituals, or other imitable phenomena with a mimicked theme. Supporters of the concept regard memes as cultural analogues to genes in that they self-replicate, mutate, and respond to selective pressures.[5] In popular language, a meme may refer to an Internet meme, typically an image, that is remixed, copied, and circulated in a shared cultural experience online.[6][7]
+          A meme (/miːm/ ⓘ; MEEM) is an idea, behavior, or style that spreads by means of imitation from person to person within a culture and often carries symbolic meaning representing a particular phenomenon or theme. <br/><br/> A meme acts as a unit for carrying cultural ideas, symbols, or practices, that can be transmitted from one mind to another through writing, speech, gestures, rituals, or other imitable phenomena with a mimicked theme. Supporters of the concept regard memes as cultural analogues to genes in that they self-replicate, mutate, and respond to selective pressures. In popular language, a meme may refer to an Internet meme, typically an image, that is remixed, copied, and circulated in a shared cultural experience online.
     </div>`
         }
     <div id="workbench" class="flex-1 flex items-stretch text-red-500 h-full min-h-0">
-      <div id="assets" class="flex flex-col min-h-0 w-96 border-r-4 border-red-500 h-full">
+      <div id="assets" class="flex flex-col min-h-0 w-64 border-r-4 border-red-500 h-full">
         <${AssetViewer} />
       </div>
       <div id="canvas" class="flex-1 h-full"><${Canvas} 
