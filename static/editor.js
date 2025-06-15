@@ -570,11 +570,20 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDelet
   </g>`;
 }
 
-function TopicButton({ roomId, name }) {
+const TOPIC_INTROS = {
+  "all-dreams-become-memes": "The position of the graphic designer within capitalistic constraints is one filled with disappointments. You’re often working for over demanding-clients, while being underpaid. This leads to a feeling of powerlessness, pessimism and cynicism. Hence the many internet memes saying 'graphic design is our prison'. Expectations are not matching reality. What exactly is causing these feelings of disillusionment? How did we go from hopeful and utopian redefinitions like Social/Medium/Speculative Design to the disappointing repitition of realist statements like ‘there is no ethical graphic design under capitalism’? Is there ethical graphic design under capitalism?",
+  "the-tools-we-never-asked-for": "Commonly used design tools live in a realm of far-going monopoly and expensive life-long subscriptions. This excludes already marginalised designers. But when free alternatives are introduced, they are often labelled as being ‘amateurish’. Why do we hate Canva so much? What other alternatives can we think of? What would happen if we all collectively stop using Adobe? How can we work together on an alternative that is just as functional? What would a collective design tool look like? How can we build it together?",
+  "command+c-is-for-collectivity": "Individualisation is everywhere, and that also applies to the field of graphic design. Most of us opt for being  freelancers, in an attempt to keep as much creative autonomy as we can. But how much autonomy does this position really give us? Doesn’t it just keep us from holding collective power? Why do schools only prepare us to be an individual, and not to be a part of something bigger? What could it mean for graphic designers to work together, not just on design projects but on collectivising the broader work field? How can we build a collective design practice that is not just about sharing work, but also about sharing resources, knowledge and power? How can we use our skills to create a more equitable and inclusive design community?",
+};
+
+function TopicButton({ roomId, name, onHover }) {
   return html`<button
     class=${clsx("flex-1 h-16 border-r-4 border-red-500 flex items-center justify-center cursor-pointer", {
       "bg-red-500 text-white": currentRoomId.value === roomId,
     })}
+    onMouseEnter=${(e) => onHover(roomId, e)}
+    onMouseMove=${(e) => onHover(roomId, e)}
+    onMouseLeave=${() => onHover(null, null)}
     onClick=${() => changeTopic(roomId)}
   >
     ${name}
@@ -654,6 +663,8 @@ function AssetViewer() {
 
 function App() {
   const [randomTitle, setRandomTitle] = useState("");
+  const [hoveredTopic, setHoveredTopic] = useState(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     setRandomTitle(generateRandomTitle());
@@ -666,18 +677,42 @@ function App() {
     return () => clearInterval(intervalId);
   }, []);
 
+  // Handler for topic button hover
+  function handleTopicHover(roomId, event) {
+    if (roomId && event) {
+      setHoveredTopic(roomId);
+      setTooltipPos({ x: event.clientX, y: event.clientY });
+    } else {
+      setHoveredTopic(null);
+    }
+  }
+
   return html`<main class="flex flex-col h-full min-h-0"> 
-    <div id="header" class="flex items-center border-b-4 border-red-500 h-16 flex-shrink-0">
+    <div id="header" class="flex items-center border-b-4 border-red-500 h-16 flex-shrink-0 relative">
       <div
         class="w-96 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-2xl p-3"
       >
         ${randomTitle}
       </div>
       <div class="flex-1 h-16 flex items-center text-red-500 font-mono">
-        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes" />
-        <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" />
-        <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" />
+        <${TopicButton} roomId="all-dreams-become-memes" name="All Dreams Become Memes" onHover=${handleTopicHover} />
+        <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" onHover=${handleTopicHover} />
+        <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" onHover=${handleTopicHover} />
       </div>
+      ${hoveredTopic &&
+        html`<div
+          style=${{
+            position: "fixed",
+            left: `${tooltipPos.x}px`,
+            top: `${tooltipPos.y}px`,
+            zIndex: 1000,
+            pointerEvents: "none",
+          }}
+          class="bg-white text-red-500 border-2 border-red-500 rounded px-4 py-2 font-mono text-sm shadow"
+        >
+          ${TOPIC_INTROS[hoveredTopic]}
+        </div>`
+      }
     </div>
     <div id="workbench" class="flex-1 flex items-stretch text-red-500 h-full min-h-0">
       <div id="assets" class="flex flex-col min-h-0 w-96 border-r-4 border-red-500 h-full">
