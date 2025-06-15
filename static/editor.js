@@ -397,6 +397,10 @@ function Canvas() {
         canvas.height = svgElement.viewBox.baseVal.height || 600;
         const ctx = canvas.getContext('2d');
 
+        // Add white background
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
         // Draw the SVG image onto the canvas
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url); // Clean up the object URL
