@@ -17,6 +17,16 @@ export const uploadRouter = {
   }).onUploadComplete((data) => {
     console.log("upload complete", data);
   }),
+
+  canvasSaver: f({
+    image: {
+      maxFileSize: "10MB", // Increased max file size for canvas images, adjust as needed
+      maxFileCount: 1,
+    },
+  }).onUploadComplete((data) => {
+    console.log("Canvas snapshot upload complete:", data);
+    // You can add additional logic here, like saving metadata to a database
+  }),
 };
 
 const __dirname = import.meta.dirname;

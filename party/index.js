@@ -55,13 +55,13 @@ class PartyServer {
     const targetUrl = "https://api.uploadthing.com/v6/listFiles";
     const headers = {
       "Content-Type": "application/json",
-      "X-Uploadthing-Api-Key": process.env.UPLOADTHING_SECRET_KEY,
+      "X-Uploadthing-Api-Key": this.room.env.UPLOADTHING_SECRET_KEY,
     };
     const requestBody = JSON.stringify({});
     const res = await fetch(targetUrl, { method: "POST", headers, body: requestBody });
     if (!res.ok) {
-      const errorText = await response.text();
-      console.error(`Uploadthing API request failed with status ${response.status}: ${errorText}`);
+      const errorText = await res.text();
+      console.error(`Uploadthing API request failed with status ${res.status}: ${errorText}`);
       return [];
     }
     const data = await res.json();
@@ -158,6 +158,40 @@ class PartyServer {
         await this.room.storage.put("items", this.items);
         this.room.broadcast(JSON.stringify({ type: "add_item", item: data.item }));
         break;
+      
+      case "delete_item":
+      // Filter out the item to be deleted from the items array
+      const initialItemCount = this.items.length;
+      this.items = this.items.filter((item) => item.id !== data.id);
+
+      if (this.items.length < initialItemCount) {
+        console.log(`Item with ID ${data.id} deleted. Remaining items: ${this.items.length}`);
+        // Persist the updated items array to the room's storage
+        await this.room.storage.put("items", this.items);
+        // Broadcast the deletion to all clients
+        this.room.broadcast(JSON.stringify({ type: "delete_item", id: data.id }));
+      } else {
+        console.warn(`Attempted to delete item with ID ${data.id} but it was not found.`);
+      }
+      break;
+
+      case "clear_canvas":
+        this.items = [];
+        await this.room.storage.put("items", this.items);
+        console.log(`Canvas cleared for room ${this.room.id}. State saved.`);
+        this.room.broadcast(JSON.stringify({type: "clear_canvas"}));
+        break;
+      
+      case "resize_item":
+          this.items = this.items.map((item) =>
+            item.id === data.id
+              ? { ...item, width: data.width, height: data.height }
+              : item
+        );
+        await this.room.storage.put("items", this.items);
+        this.room.broadcast(JSON.stringify(data));
+        break;
+
 
       default:
         console.warn(`Unknown message type received: ${data.type}`);
