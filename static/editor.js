@@ -527,12 +527,6 @@ function Canvas({showHelp, setShowHelp, helpText}) {
           class="mt-2 bg-white text-red-500 border-2 border-red-500 rounded px-4 py-2 font-mono text-sm shadow relative"
           style="min-width: 250px; max-width: 800px; z-index:1200;"
         >
-          <button
-            class="absolute top-2 right-2 text-red-500 hover:text-white hover:bg-red-500 rounded-full w-6 h-6 flex items-center justify-center font-bold border border-red-500"
-            onClick=${() => setShowHelp(false)}
-            aria-label="Close help"
-            style="z-index:1210;"
-          >×</button>
           ${helpText}
         </div>
       `}
