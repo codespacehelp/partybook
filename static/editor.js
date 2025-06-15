@@ -1,6 +1,6 @@
 import PartySocket from "partysocket";
 import { h, render } from "preact";
-import { useEffect, useRef, useState, useCallback } from "preact/hooks"; // Import useCallback
+import { useEffect, useRef, useState, useCallback } from "preact/hooks";
 import htm from "htm";
 import { signal, computed } from "@preact/signals";
 import clsx from "clsx";
@@ -10,10 +10,18 @@ const html = htm.bind(h);
 
 const BASE_URL = "http://localhost:3000";
 
-export const { uploadFiles, createUpload } = genUploader({
+// Uploader for assets (existing)
+export const { uploadFiles: uploadAssetFiles, createUpload: createAssetUpload } = genUploader({
   url: BASE_URL,
   package: "vanilla",
 });
+
+// NEW: Uploader for saved canvas images (assuming a different Uploadthing endpoint/router for this)
+export const { uploadFiles: uploadCanvasFiles, createUpload: createCanvasUpload } = genUploader({
+  url: BASE_URL,
+  package: "vanilla",
+});
+
 
 const currentRoomId = signal("all-dreams-become-memes"); // Default room ID
 const items = signal([]);
@@ -21,7 +29,7 @@ const cursors = signal([]);
 const selection = signal([]);
 const assets = signal([]);
 
-const UPLOADTHING_API_KEY = "";
+const UPLOADTHING_API_KEY = ""; // Keep this as an empty string as per instructions
 
 // --- Title Generator Logic ---
 const M1 = ["MARGINS", "MAYBE", "MY", "MUST", "MARGINS", "MARGINS", "MY", "MORE", "MAKE"];
@@ -133,6 +141,10 @@ function Canvas() {
   // Using a ref for ws to ensure useCallback has a stable reference to the latest ws instance
   const wsRef = useRef(null);
 
+  // State to manage loading feedback for saving
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+
   useEffect(() => {
     console.log("Opening WebSocket connection to room:", currentRoomId.value);
 
@@ -190,26 +202,19 @@ function Canvas() {
       }
     });
 
-    // PartySocket handles reconnects automatically, so ws.reconnect() is removed.
-    // ws.reconnect(); // REMOVED
-
     const handleMouseMove = (e) => {
       const svg = svgRef.current;
       if (!svg) return;
 
-      // Get the SVG's current transformation matrix from screen to SVG coordinates
       const CTM = svg.getScreenCTM();
-      if (!CTM) return; // Should not happen if SVG exists
+      if (!CTM) return;
 
-      // Create an SVGPoint for the mouse coordinates
       const pt = svg.createSVGPoint();
       pt.x = e.clientX;
       pt.y = e.clientY;
 
-      // Transform the screen coordinates to SVG viewBox coordinates
       const svgP = pt.matrixTransform(CTM.inverse());
 
-      // Send SVG viewBox coordinates using the ref
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "cursor", id: wsRef.current.id, x: svgP.x, y: svgP.y }));
       }
@@ -224,14 +229,9 @@ function Canvas() {
         wsRef.current.close();
       }
     };
-  }, [currentRoomId.value]); // Dependency on room ID to re-establish connection
+  }, [currentRoomId.value]);
 
-  // Use useCallback for stable function references for drag and drop
-  // Dependencies for useCallback should include anything from the component's scope
-  // that the function uses and might change over time, to ensure the function is "fresh".
-  // Signals' .value are always fresh, but the signal object itself is stable.
   const handleItemMouseDrag = useCallback((event) => {
-    // Ensure refs are valid before proceeding
     if (!startMousePositionRef.current || !startItemPositionsRef.current) {
         console.warn("Drag cancelled: start position refs are null or undefined.");
         window.removeEventListener("mousemove", handleItemMouseDrag);
@@ -264,12 +264,10 @@ function Canvas() {
     const deltaX = currentSvgP.x - startX; // Delta in SVG coords
     const deltaY = currentSvgP.y - startY; // Delta in SVG coords
 
-    // Apply delta to item's original viewBox position
-    // Create a new array to trigger Preact re-render for signal update
-    const newItems = [...items.value]; // Access current value of items signal
+    const newItems = [...items.value];
     let itemsMoved = false;
     for (const item of newItems) {
-      if (selection.value.includes(item.id)) { // Access current value of selection signal
+      if (selection.value.includes(item.id)) {
         const startPos = startItemPositionsRef.current.find((pos) => pos.id === item.id);
         if (startPos) {
           item.x = startPos.x + deltaX;
@@ -279,33 +277,30 @@ function Canvas() {
       }
     }
     if (itemsMoved) {
-      items.value = newItems; // Update the signal
+      items.value = newItems;
     }
 
 
-    // Send updates for each selected item using the latest wsRef.current
-    selectedItems.value.forEach((item) => { // Access current value of selectedItems computed signal
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) { // Ensure websocket is open
+    selectedItems.value.forEach((item) => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
       }
     });
-  }, [items.value, selection.value, selectedItems.value, svgRef, wsRef]); // Dependencies: Include refs and signal values if they are directly used in calculations/logic that should re-trigger the useCallback
+  }, [items.value, selection.value, selectedItems.value, svgRef, wsRef]);
 
 
   const handleItemMouseUp = useCallback(() => {
     console.log("handleItemMouseUp triggered");
     window.removeEventListener("mousemove", handleItemMouseDrag);
     window.removeEventListener("mouseup", handleItemMouseUp);
-    // Clear refs after drag ends to prevent stale state
     startMousePositionRef.current = null;
     startItemPositionsRef.current = null;
-  }, [handleItemMouseDrag]); // Dependency: handleItemMouseDrag (the stable useCallback version)
+  }, [handleItemMouseDrag]);
 
 
   function handleItemMouseDown(event, item) {
     console.log("handleItemMouseDown triggered for item:", item.id);
-    // Only select if not double-clicking (to prevent selection during delete)
-    if (event.detail === 1) { // event.detail is 1 for single click, 2 for double click
+    if (event.detail === 1) {
       const svg = svgRef.current;
       if (!svg) {
         console.error("handleItemMouseDown: SVG ref is null.");
@@ -322,37 +317,134 @@ function Canvas() {
       pt.y = event.clientY;
       const svgP = pt.matrixTransform(CTM.inverse());
 
-      startMousePositionRef.current = { x: svgP.x, y: svgP.y }; // Store SVG coordinates of mouse click
-      startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }]; // Item's own viewBox coords
-      selection.value = [item.id]; // Ensure selection is updated here
+      startMousePositionRef.current = { x: svgP.x, y: svgP.y };
+      startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }];
+      selection.value = [item.id];
 
       console.log("Attaching mousemove/mouseup listeners.");
-      // Attach the stable useCallback versions of the handlers
       window.addEventListener("mousemove", handleItemMouseDrag);
       window.addEventListener("mouseup", handleItemMouseUp);
     }
   }
 
   function handleDeleteItem(itemId) {
-    // Optimistic update: remove locally first for immediate feedback
     items.value = items.value.filter((item) => item.id !== itemId);
-    // Send message to PartyKit server to notify other clients using the ref
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "delete_item", id: itemId }));
     }
   }
 
   function handleClearCanvas() {
-    // Send message to PartyKit server to clear for all clients using the ref
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "clear_canvas" }));
     }
-    // Optimistic update: clear locally right away for immediate feedback
     items.value = [];
   }
 
-  // bounds is no longer needed for cursor positioning but might be useful for other things.
-  // const bounds = svgRef.current ? svgRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+  // NEW: Function to save the canvas as an image
+  async function handleSaveCanvas() {
+    setIsSaving(true);
+    setSaveMessage("Saving canvas...");
+    const svgElement = svgRef.current;
+    if (!svgElement) {
+      setSaveMessage("Error: Canvas not found.");
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      // Create a temporary clone of the SVG to manipulate (e.g., inline images)
+      const clonedSvg = svgElement.cloneNode(true);
+
+      // Important: Fetch and inline external images to avoid CORS issues when drawing to canvas.
+      // This is necessary because canvas.toDataURL will "taint" the canvas if it draws cross-origin images.
+      const imageElements = Array.from(clonedSvg.querySelectorAll('image'));
+      const promises = imageElements.map(async (img) => {
+        const href = img.getAttribute('href');
+        if (href && !href.startsWith('data:')) {
+          try {
+            const response = await fetch(href);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const blob = await response.blob();
+            return new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                img.setAttribute('href', reader.result); // Replace original href with data URL
+                resolve();
+              };
+              reader.readAsDataURL(blob);
+            });
+          } catch (error) {
+            console.error('Error inlining image:', href, error);
+            // Optionally, replace with a placeholder or remove the image if it fails
+            img.remove();
+          }
+        }
+      });
+
+      await Promise.all(promises); // Wait for all images to be inlined
+
+      // Get the serialized SVG XML string
+      const svgData = new XMLSerializer().serializeToString(clonedSvg);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        // Set canvas dimensions to match SVG viewBox for clear output
+        canvas.width = svgElement.viewBox.baseVal.width || 800;
+        canvas.height = svgElement.viewBox.baseVal.height || 600;
+        const ctx = canvas.getContext('2d');
+
+        // Draw the SVG image onto the canvas
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url); // Clean up the object URL
+
+        // Convert canvas to Blob (e.g., PNG)
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const fileName = `canvas-snapshot-${Date.now()}.png`;
+            const file = new File([blob], fileName, { type: 'image/png' });
+
+            try {
+              // Assuming 'canvasSaver' is the route in your Uploadthing config for saving canvases
+              const res = await uploadCanvasFiles((routeRegistry) => routeRegistry.canvasSaver, {
+                files: [file],
+                onUploadProgress: ({ totalProgress }) => {
+                  setSaveMessage(`Uploading: ${totalProgress}%`);
+                },
+              });
+              console.log("Canvas saved to Uploadthing:", res);
+              setSaveMessage("Canvas saved successfully!");
+            } catch (uploadError) {
+              console.error("Error uploading canvas to Uploadthing:", uploadError);
+              setSaveMessage(`Error uploading: ${uploadError.message}`);
+            }
+          } else {
+            setSaveMessage("Error: Could not convert canvas to image.");
+          }
+          setIsSaving(false);
+          setTimeout(() => setSaveMessage(""), 3000); // Clear message after a few seconds
+        }, 'image/png');
+      };
+      img.onerror = (error) => {
+        URL.revokeObjectURL(url);
+        console.error("Error loading SVG image for canvas conversion:", error);
+        setSaveMessage("Error converting SVG to image.");
+        setIsSaving(false);
+        setTimeout(() => setSaveMessage(""), 3000);
+      };
+      img.src = url;
+
+    } catch (error) {
+      console.error("Error during canvas save process:", error);
+      setSaveMessage(`Error: ${error.message}`);
+      setIsSaving(false);
+      setTimeout(() => setSaveMessage(""), 3000);
+    }
+  }
+
 
   // --- Render (Access .value to use signals) ---
   return html`<div class="relative w-full h-full">
@@ -379,12 +471,22 @@ function Canvas() {
         />`,
     )}
     </svg>
-    <button
-      class="absolute bottom-4 right-4 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase"
-      onClick=${handleClearCanvas}
-    >
-      Clear Canvas
-    </button>
+    <div class="absolute bottom-4 right-4 flex flex-col items-end space-y-2">
+      <button
+        class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase"
+        onClick=${handleSaveCanvas}
+        disabled=${isSaving}
+      >
+        ${isSaving ? 'Saving...' : 'Save Canvas'}
+      </button>
+      <button
+        class="px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase"
+        onClick=${handleClearCanvas}
+      >
+        Clear Canvas
+      </button>
+      ${saveMessage && html`<div class="text-red-500 font-mono text-sm">${saveMessage}</div>`}
+    </div>
   </div>`;
 }
 
@@ -404,7 +506,7 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDelet
     href=${item.url}
     onMouseDown=${handleMouseDown}
     onDblClick=${handleDoubleClick}
-    class="select-none" />`;
+    class="select-none cursor-pointer" />`;
 }
 
 function TopicButton({ roomId, name }) {
@@ -422,7 +524,7 @@ function AssetViewer() {
   const formRef = useRef();
   const fileInputRef = useRef();
 
-  // Handle file upload
+  // Handle file upload for assets
   async function handleUpload(e) {
     e.preventDefault();
     const fileInput = fileInputRef.current;
@@ -430,7 +532,7 @@ function AssetViewer() {
     const files = Array.from(fileInput.files || []);
     console.log(files);
     try {
-      const res = await uploadFiles((routeRegistry) => routeRegistry.imageUploader, {
+      const res = await uploadAssetFiles((routeRegistry) => routeRegistry.imageUploader, { // Changed to uploadAssetFiles
         files,
         //signal: ac.signal,
         // onUploadProgress: ({ totalProgress }) => {
@@ -440,7 +542,7 @@ function AssetViewer() {
       console.log(res);
 
       for (const file of res) {
-        if (ws && ws.readyState === WebSocket.OPEN) { // Use the global ws instance here
+        if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "upload", id: file.key, url: file.ufsUrl, name: file.name }));
         }
       }
@@ -453,9 +555,7 @@ function AssetViewer() {
 
   // Handle asset click: add to canvas and broadcast
   function handleAssetClick(asset) {
-    // Generate a unique ID for the new item
     const newId = `${asset.id}-${Date.now()}`;
-    // Default position (center-ish)
     const x = 400;
     const y = 300;
     const newItem = {
@@ -466,9 +566,7 @@ function AssetViewer() {
       y,
       name: asset.name,
     };
-    // Locally add to items (for immediate feedback)
     items.value = [...items.value, newItem];
-    // Send to server so all clients get it
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "add_item", item: newItem }));
     }
@@ -504,9 +602,8 @@ function App() {
       setRandomTitle(generateRandomTitle());
     }, intervalInMilliseconds);
 
-    // Clean up the interval when the component unmounts
     return () => clearInterval(intervalId);
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, []);
 
   return html`<main class="flex flex-col h-screen">
     <div id="header" class="flex items-center border-b-4 border-red-500">
