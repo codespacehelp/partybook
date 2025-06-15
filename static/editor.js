@@ -173,6 +173,9 @@ function Canvas() {
         case "delete_item":
           items.value = items.value.filter((item) => item.id !==messageid);
           break;
+        case "clear_canvas": 
+          items.value = [];
+          break;
       }
     });
 
@@ -224,20 +227,29 @@ function Canvas() {
     }
   }
 
+  function handleClearCanvas() {
+    // Send message to PartyKit server to clear for all clients
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "clear_canvas" }));
+    }
+    // Optimistic update: clear locally right away for immediate feedback
+    items.value = [];
+  }
+
   const bounds = svgRef.current ? svgRef.current.getBoundingClientRect() : { left: 0, top: 0 };
 
   // --- Render (Access .value to use signals) ---
   // Preact automatically subscribes and re-renders when signals change
-  return html`<svg width="800" height="600" viewBox="0 0 800 600" ref=${svgRef} class="cursor-none">
+  return html`<div class="relative w-full h-full">
+    <svg width="100%" height="100%" viewBox="0 0 800 600" ref=${svgRef} class="cursor-none">
     ${items.value.map((item) => {
-      // Access .value here
       if (item.type === "image") {
         return html`<${ImageItem}
           key=${item.id}
           item=${item}
           handleItemMouseDown=${handleItemMouseDown}
           handleItemMouseDrag=${handleItemMouseDrag}
-          handleDeleteItem=${handleDeleteItem}
+          handleDeleteItem=${handleDeleteItem} // Pass the new handler
         />`;
       }
     })}
@@ -251,7 +263,14 @@ function Canvas() {
           class="pointer-events-none"
         />`,
     )}
-  </svg>`;
+    </svg>
+    <button
+      class="absolute bottom-4 right-4 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase"
+      onClick=${handleClearCanvas}
+    >
+      Clear Canvas
+    </button>
+  </div>`;
 }
 
 function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDeleteItem }) {
