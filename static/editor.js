@@ -661,7 +661,7 @@ function App() {
     const intervalInMilliseconds = 0.1 * 60 * 1000; // 6 seconds
     const intervalId = setInterval(() => {
       setRandomTitle(generateRandomTitle());
-    }, intervalId); // Corrected to use intervalId for cleanup
+    }, intervalInMilliseconds); // Corrected to use intervalId for cleanup
 
     return () => clearInterval(intervalId);
   }, []);
