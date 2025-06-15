@@ -131,7 +131,7 @@ const selectedItems = computed(() =>
 // WebSocket instance outside of components
 let ws = null; // This will hold the PartySocket instance
 
-function Canvas() {
+function Canvas({showHelp, setShowHelp, helpText}) {
   const svgRef = useRef(null);
   const startMousePositionRef = useRef(null); // Stores SVG coordinates of mouse start
   const startItemPositionsRef = useRef(null); // Stores SVG coordinates of item start
@@ -515,7 +515,29 @@ function Canvas() {
         />`,
     )}
     </svg>
-    <div class="absolute bottom-4 right-4 flex flex-col items-end">
+    <div class="absolute top-4 right-4 flex flex-col items-end z-30">
+      <button
+        class="w-10 h-10 flex items-center justify-center rounded-full bg-red-500 text-white font-mono text-2xl border-2 border-red-500 shadow hover:bg-white hover:text-red-500 transition-colors"
+        onClick=${() => setShowHelp((v) => !v)}
+        aria-label="Show help"
+        style="z-index:1100;"
+      >?</button>
+      ${showHelp && html`
+        <div
+          class="mt-2 bg-white text-red-500 border-2 border-red-500 rounded px-4 py-2 font-mono text-sm shadow relative"
+          style="min-width: 250px; max-width: 800px; z-index:1200;"
+        >
+          <button
+            class="absolute top-2 right-2 text-red-500 hover:text-white hover:bg-red-500 rounded-full w-6 h-6 flex items-center justify-center font-bold border border-red-500"
+            onClick=${() => setShowHelp(false)}
+            aria-label="Close help"
+            style="z-index:1210;"
+          >×</button>
+          ${helpText}
+        </div>
+      `}
+    </div>
+    <div class="absolute bottom-4 right-4 flex flex-col items-end z-20">
       ${saveMessage && html`<div class="text-red-500 font-mono text-sm mb-2">${saveMessage}</div>`}
       <div class="flex flex-row space-x-2">
         <button
@@ -665,6 +687,9 @@ function App() {
   const [randomTitle, setRandomTitle] = useState("");
   const [hoveredTopic, setHoveredTopic] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [showTitleTooltip, setShowTitleTooltip] = useState(false);
+  const [titleTooltipPos, setTitleTooltipPos] = useState({ x: 0, y: 0 });
+  const [showHelp, setShowHelp] = useState(false);
 
   useEffect(() => {
     setRandomTitle(generateRandomTitle());
@@ -687,11 +712,42 @@ function App() {
     }
   }
 
+  function handleTitleHover(event) {
+    if (event){
+      setShowTitleTooltip(true);
+      setTitleTooltipPos({ x: event.clientX, y: event.clientY });
+    }
+    else {
+      setShowTitleTooltip(false);
+    }
+  }
+
+  const helpText = html`
+  <div> 
+  <b>Welcome to the <i>What Are We Doing Here?</i> 'M E M E -MAKER'!</b><br/><br/>
+    Feel free to use this tool and your intuition to combine and create images (or memes, if you will). Hover over the ever-changing title and the different topics at the top of the screen to read small introductions on each of them, and let those lead you on your image-making adventures.<br/><br/>
+    - Click on a topic to switch to the according canvas.<br/>
+    - Click on the images in the asset viewer to add them to the canvas.<br/>
+    - Drag the images around to position them.<br/>
+    - Resize the images by dragging the red square in the bottom right corner.<br/>
+    - Double-click an image to delete it.<br/>
+    - Use the "Clear" button to remove all images from the canvas.<br/><br/> 
+    Once you’re happy, click ‘SAVE’. This sends your creation to a public folder which will serve as a collaborative open-source collection of 'memes' on the topic of graphic design for/against the world. Once enough memes have been added, they will be collected and printed as a third edition of the What Are We Doing Here? series. <br/><br/>
+    Have fun creating! If you have any questions, ideas, or suggestions, feel free to contact me at seravandewater@hotmail.com or @seravandewater on Instagram.
+  </div>
+  `;
+
+  
+
   return html`<main class="flex flex-col h-full min-h-0"> 
     <div id="header" class="flex items-center border-b-4 border-red-500 h-16 flex-shrink-0 relative">
       <div
         class="w-96 h-16 border-r-4 border-red-500 text-red-500 flex items-center justify-left font-mono text-2xl p-3"
-      >
+        onMouseEnter=${handleTitleHover}
+        onMouseMove=${handleTitleHover}
+        onMouseLeave=${() => handleTitleHover(null)}
+        style="position:relative;"
+        >
         ${randomTitle}
       </div>
       <div class="flex-1 h-16 flex items-center text-red-500 font-mono">
@@ -699,6 +755,7 @@ function App() {
         <${TopicButton} roomId="the-tools-we-never-asked-for" name="The Tools We Never Asked For" onHover=${handleTopicHover} />
         <${TopicButton} roomId="command+c-is-for-collectivity" name="Command+C Is For Collectivity" onHover=${handleTopicHover} />
       </div>
+    </div>
       ${hoveredTopic &&
         html`<div
           style=${{
@@ -713,12 +770,29 @@ function App() {
           ${TOPIC_INTROS[hoveredTopic]}
         </div>`
       }
-    </div>
+      ${showTitleTooltip &&
+        html`<div
+          style=${{
+            position: "fixed",
+            left: `${titleTooltipPos.x}px`,
+            top: `${titleTooltipPos.y}px`,
+            zIndex: 1000,
+            pointerEvents: "none",
+          }}
+          class="bg-white text-red-500 border-2 border-red-500 rounded px-4 py-2 font-mono text-sm shadow"
+        >
+          A meme (/miːm/ ⓘ; MEEM)[1][2][3] is an idea, behavior, or style that spreads by means of imitation from person to person within a culture and often carries symbolic meaning representing a particular phenomenon or theme.[4] A meme acts as a unit for carrying cultural ideas, symbols, or practices, that can be transmitted from one mind to another through writing, speech, gestures, rituals, or other imitable phenomena with a mimicked theme. Supporters of the concept regard memes as cultural analogues to genes in that they self-replicate, mutate, and respond to selective pressures.[5] In popular language, a meme may refer to an Internet meme, typically an image, that is remixed, copied, and circulated in a shared cultural experience online.[6][7]
+    </div>`
+        }
     <div id="workbench" class="flex-1 flex items-stretch text-red-500 h-full min-h-0">
       <div id="assets" class="flex flex-col min-h-0 w-96 border-r-4 border-red-500 h-full">
         <${AssetViewer} />
       </div>
-      <div id="canvas" class="flex-1 h-full"><${Canvas} /></div>
+      <div id="canvas" class="flex-1 h-full"><${Canvas} 
+        showHelp=${showHelp}
+        setShowHelp=${setShowHelp}
+        helpText=${helpText}
+      /></div>
     </div>
   </main> `;
 }
