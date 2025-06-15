@@ -667,10 +667,7 @@ function AssetViewer() {
   }
 
   return html`<div class="p-4 flex flex-col h-full">
-  <form class="uppercase" ref=${formRef} onSubmit=${handleUpload}>
-      <input class="font-mono uppercase cursor-pointer" type="file" ref=${fileInputRef} />
-      <button class="cursor-pointer mt-4 mb-8 px-4 py-2 bg-red-500 text-white font-mono rounded hover:bg-white hover:text-red-500 border-2 border-red-500 uppercase" type="submit">Upload</button>
-    </form>  
+  
   <ul class="flex-1 overflow-auto min-h-0 grid grid-cols-2 gap-0">
       ${assets.value &&
       assets.value.map(
