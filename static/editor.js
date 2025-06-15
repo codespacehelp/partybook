@@ -1,6 +1,6 @@
 import PartySocket from "partysocket";
 import { h, render } from "preact";
-import { useEffect, useRef, useState } from "preact/hooks"; // Import useState
+import { useEffect, useRef, useState, useCallback } from "preact/hooks"; // Import useCallback
 import htm from "htm";
 import { signal, computed } from "@preact/signals";
 import clsx from "clsx";
@@ -23,7 +23,7 @@ const assets = signal([]);
 
 const UPLOADTHING_API_KEY = "";
 
-// --- Title Generator Logic (Moved In-line) ---
+// --- Title Generator Logic ---
 const M1 = ["MARGINS", "MAYBE", "MY", "MUST", "MARGINS", "MARGINS", "MY", "MORE", "MAKE"];
 const E1 = [
   "EMBRACE",
@@ -123,22 +123,33 @@ const selectedItems = computed(() =>
 );
 
 // WebSocket instance outside of components
-let ws = null;
+let ws = null; // This will hold the PartySocket instance
 
 function Canvas() {
   const svgRef = useRef(null);
-  const startMousePositionRef = useRef();
-  const startItemPositionsRef = useRef();
+  const startMousePositionRef = useRef(null); // Stores SVG coordinates of mouse start
+  const startItemPositionsRef = useRef(null); // Stores SVG coordinates of item start
+
+  // Using a ref for ws to ensure useCallback has a stable reference to the latest ws instance
+  const wsRef = useRef(null);
 
   useEffect(() => {
     console.log("Opening WebSocket connection to room:", currentRoomId.value);
 
-    ws = new PartySocket({
+    // Close existing connection if switching rooms
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.close();
+    }
+
+    const newWs = new PartySocket({
       host: "localhost:1999",
       room: currentRoomId.value,
     });
 
-    ws.addEventListener("message", (e) => {
+    wsRef.current = newWs; // Store the new websocket instance in the ref
+    ws = newWs; // Also update the global 'let ws' for other parts of the app
+
+    newWs.addEventListener("message", (e) => {
       const message = JSON.parse(e.data);
 
       switch (message.type) {
@@ -170,20 +181,38 @@ function Canvas() {
         case "add_item":
           items.value = [...items.value, message.item];
           break;
-        case "delete_item":
-          items.value = items.value.filter((item) => item.id !==messageid);
+        case "delete_item": // New case for deleting items
+          items.value = items.value.filter((item) => item.id !== message.id);
           break;
-        case "clear_canvas": 
-          items.value = [];
+        case "clear_canvas": // Handle clear_canvas message
+          items.value = []; // Clear all items locally
           break;
       }
     });
 
-    ws.reconnect();
+    // PartySocket handles reconnects automatically, so ws.reconnect() is removed.
+    // ws.reconnect(); // REMOVED
 
     const handleMouseMove = (e) => {
-      ws.send(JSON.stringify({ type: "cursor", id: ws.id, x: e.clientX, y: e.clientY }));
-      // We don't need to update our own cursor locally with signals unless desired
+      const svg = svgRef.current;
+      if (!svg) return;
+
+      // Get the SVG's current transformation matrix from screen to SVG coordinates
+      const CTM = svg.getScreenCTM();
+      if (!CTM) return; // Should not happen if SVG exists
+
+      // Create an SVGPoint for the mouse coordinates
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+
+      // Transform the screen coordinates to SVG viewBox coordinates
+      const svgP = pt.matrixTransform(CTM.inverse());
+
+      // Send SVG viewBox coordinates using the ref
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: "cursor", id: wsRef.current.id, x: svgP.x, y: svgP.y }));
+      }
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -191,55 +220,141 @@ function Canvas() {
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       console.log("Closing WebSocket connection");
-      ws.close();
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     };
-  }, [currentRoomId.value]);
+  }, [currentRoomId.value]); // Dependency on room ID to re-establish connection
 
-  function handleItemMouseDown(event, item) {
-    selection.value = [item.id];
+  // Use useCallback for stable function references for drag and drop
+  // Dependencies for useCallback should include anything from the component's scope
+  // that the function uses and might change over time, to ensure the function is "fresh".
+  // Signals' .value are always fresh, but the signal object itself is stable.
+  const handleItemMouseDrag = useCallback((event) => {
+    // Ensure refs are valid before proceeding
+    if (!startMousePositionRef.current || !startItemPositionsRef.current) {
+        console.warn("Drag cancelled: start position refs are null or undefined.");
+        window.removeEventListener("mousemove", handleItemMouseDrag);
+        window.removeEventListener("mouseup", handleItemMouseUp);
+        return;
+    }
 
-    startMousePositionRef.current = { x: event.clientX, y: event.clientY };
-    startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }];
-  }
+    const svg = svgRef.current;
+    if (!svg) {
+        console.warn("Drag cancelled: SVG ref is null.");
+        window.removeEventListener("mousemove", handleItemMouseDrag);
+        window.removeEventListener("mouseup", handleItemMouseUp);
+        return;
+    }
+    const CTM = svg.getScreenCTM();
+    if (!CTM) {
+        console.warn("Drag cancelled: CTM is null.");
+        window.removeEventListener("mousemove", handleItemMouseDrag);
+        window.removeEventListener("mouseup", handleItemMouseUp);
+        return;
+    }
 
-  function handleItemMouseDrag(event) {
+    const pt = svg.createSVGPoint();
+    pt.x = event.clientX;
+    pt.y = event.clientY;
+    const currentSvgP = pt.matrixTransform(CTM.inverse()); // Current mouse position in SVG coords
+
     const startX = startMousePositionRef.current.x;
     const startY = startMousePositionRef.current.y;
-    const currentX = event.clientX;
-    const currentY = event.clientY;
-    const deltaX = currentX - startX;
-    const deltaY = currentY - startY;
+    const deltaX = currentSvgP.x - startX; // Delta in SVG coords
+    const deltaY = currentSvgP.y - startY; // Delta in SVG coords
 
-    moveSelectedItems(deltaX, deltaY, startItemPositionsRef.current);
+    // Apply delta to item's original viewBox position
+    // Create a new array to trigger Preact re-render for signal update
+    const newItems = [...items.value]; // Access current value of items signal
+    let itemsMoved = false;
+    for (const item of newItems) {
+      if (selection.value.includes(item.id)) { // Access current value of selection signal
+        const startPos = startItemPositionsRef.current.find((pos) => pos.id === item.id);
+        if (startPos) {
+          item.x = startPos.x + deltaX;
+          item.y = startPos.y + deltaY;
+          itemsMoved = true;
+        }
+      }
+    }
+    if (itemsMoved) {
+      items.value = newItems; // Update the signal
+    }
 
-    // Send updates for each selected item (using the computed signal)
-    selectedItems.value.forEach((item) => {
-      ws.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
+
+    // Send updates for each selected item using the latest wsRef.current
+    selectedItems.value.forEach((item) => { // Access current value of selectedItems computed signal
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) { // Ensure websocket is open
+        wsRef.current.send(JSON.stringify({ type: "item_move", id: item.id, x: item.x, y: item.y }));
+      }
     });
+  }, [items.value, selection.value, selectedItems.value, svgRef, wsRef]); // Dependencies: Include refs and signal values if they are directly used in calculations/logic that should re-trigger the useCallback
+
+
+  const handleItemMouseUp = useCallback(() => {
+    console.log("handleItemMouseUp triggered");
+    window.removeEventListener("mousemove", handleItemMouseDrag);
+    window.removeEventListener("mouseup", handleItemMouseUp);
+    // Clear refs after drag ends to prevent stale state
+    startMousePositionRef.current = null;
+    startItemPositionsRef.current = null;
+  }, [handleItemMouseDrag]); // Dependency: handleItemMouseDrag (the stable useCallback version)
+
+
+  function handleItemMouseDown(event, item) {
+    console.log("handleItemMouseDown triggered for item:", item.id);
+    // Only select if not double-clicking (to prevent selection during delete)
+    if (event.detail === 1) { // event.detail is 1 for single click, 2 for double click
+      const svg = svgRef.current;
+      if (!svg) {
+        console.error("handleItemMouseDown: SVG ref is null.");
+        return;
+      }
+      const CTM = svg.getScreenCTM();
+      if (!CTM) {
+        console.error("handleItemMouseDown: CTM is null.");
+        return;
+      }
+
+      const pt = svg.createSVGPoint();
+      pt.x = event.clientX;
+      pt.y = event.clientY;
+      const svgP = pt.matrixTransform(CTM.inverse());
+
+      startMousePositionRef.current = { x: svgP.x, y: svgP.y }; // Store SVG coordinates of mouse click
+      startItemPositionsRef.current = [{ id: item.id, x: item.x, y: item.y }]; // Item's own viewBox coords
+      selection.value = [item.id]; // Ensure selection is updated here
+
+      console.log("Attaching mousemove/mouseup listeners.");
+      // Attach the stable useCallback versions of the handlers
+      window.addEventListener("mousemove", handleItemMouseDrag);
+      window.addEventListener("mouseup", handleItemMouseUp);
+    }
   }
 
   function handleDeleteItem(itemId) {
     // Optimistic update: remove locally first for immediate feedback
     items.value = items.value.filter((item) => item.id !== itemId);
-    // Send message to PartyKit server to notify other clients
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "delete_item", id: itemId }));
+    // Send message to PartyKit server to notify other clients using the ref
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "delete_item", id: itemId }));
     }
   }
 
   function handleClearCanvas() {
-    // Send message to PartyKit server to clear for all clients
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "clear_canvas" }));
+    // Send message to PartyKit server to clear for all clients using the ref
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: "clear_canvas" }));
     }
     // Optimistic update: clear locally right away for immediate feedback
     items.value = [];
   }
 
-  const bounds = svgRef.current ? svgRef.current.getBoundingClientRect() : { left: 0, top: 0 };
+  // bounds is no longer needed for cursor positioning but might be useful for other things.
+  // const bounds = svgRef.current ? svgRef.current.getBoundingClientRect() : { left: 0, top: 0 };
 
   // --- Render (Access .value to use signals) ---
-  // Preact automatically subscribes and re-renders when signals change
   return html`<div class="relative w-full h-full">
     <svg width="100%" height="100%" viewBox="0 0 800 600" ref=${svgRef} class="cursor-none">
     ${items.value.map((item) => {
@@ -256,8 +371,8 @@ function Canvas() {
     ${cursors.value.map(
       (cursor) =>
         html`<circle
-          cx=${cursor.x - bounds.left}
-          cy=${cursor.y - bounds.top}
+          cx=${cursor.x}
+          cy=${cursor.y}
           r="10"
           fill=${cursor.color}
           class="pointer-events-none"
@@ -276,17 +391,6 @@ function Canvas() {
 function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDeleteItem }) {
   function handleMouseDown(event) {
     handleItemMouseDown(event, item);
-    window.addEventListener("mousemove", handleMouseDrag);
-    window.addEventListener("mouseup", handleMouseUp);
-  }
-
-  function handleMouseDrag(event) {
-    handleItemMouseDrag(event);
-  }
-
-  function handleMouseUp() {
-    window.removeEventListener("mousemove", handleMouseDrag);
-    window.removeEventListener("mouseup", handleMouseUp);
   }
 
   function handleDoubleClick(event) {
@@ -294,7 +398,13 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDelet
     handleDeleteItem(item.id);
   }
 
-  return html`<image x=${item.x} y=${item.y} href=${item.url} onMouseDown=${handleMouseDown} onDblClick=${handleDoubleClick} class="select-none" />`;
+  return html`<image
+    x=${item.x}
+    y=${item.y}
+    href=${item.url}
+    onMouseDown=${handleMouseDown}
+    onDblClick=${handleDoubleClick}
+    class="select-none" />`;
 }
 
 function TopicButton({ roomId, name }) {
@@ -330,7 +440,9 @@ function AssetViewer() {
       console.log(res);
 
       for (const file of res) {
-        ws.send(JSON.stringify({ type: "upload", id: file.key, url: file.ufsUrl, name: file.name }));
+        if (ws && ws.readyState === WebSocket.OPEN) { // Use the global ws instance here
+          ws.send(JSON.stringify({ type: "upload", id: file.key, url: file.ufsUrl, name: file.name }));
+        }
       }
     } catch (err) {
       console.error(err);
@@ -357,7 +469,9 @@ function AssetViewer() {
     // Locally add to items (for immediate feedback)
     items.value = [...items.value, newItem];
     // Send to server so all clients get it
-    ws.send(JSON.stringify({ type: "add_item", item: newItem }));
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "add_item", item: newItem }));
+    }
   }
 
   return html`<div class="p-4 overflow-hidden flex flex-col">
@@ -375,7 +489,7 @@ function AssetViewer() {
           </li>`,
       )}
     </ul>
-    
+
   </div>`;
 }
 
