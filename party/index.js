@@ -175,6 +175,14 @@ class PartyServer {
       }
       break;
 
+      case "clear_canvas":
+        this.items = [];
+        await this.room.storage.put("items", this.items);
+        console.log(`Canvas cleared for room ${this.room.id}. State saved.`);
+        this.room.broadcast(JSON.stringify({type: "clear_canvas"}));
+        break;
+
+
       default:
         console.warn(`Unknown message type received: ${data.type}`);
         // For any other unknown message type, you might still want to broadcast it
