@@ -9,6 +9,7 @@ Open the code in VS Code, then open two terminals:
 ## Terminal 1
 
 ```
+$Env:PATH = "C:\node"
 npm install
 npm run dev
 ```
@@ -16,6 +17,7 @@ npm run dev
 ## Terminal 2
 
 ```
+$Env:PATH = "C:\node"
 npm run partykit-dev
 ```
 
