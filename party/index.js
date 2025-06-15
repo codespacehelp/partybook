@@ -181,6 +181,16 @@ class PartyServer {
         console.log(`Canvas cleared for room ${this.room.id}. State saved.`);
         this.room.broadcast(JSON.stringify({type: "clear_canvas"}));
         break;
+      
+      case "resize_item":
+          this.items = this.items.map((item) =>
+            item.id === data.id
+              ? { ...item, width: data.width, height: data.height }
+              : item
+        );
+        await this.room.storage.put("items", this.items);
+        this.room.broadcast(JSON.stringify(data));
+        break;
 
 
       default:

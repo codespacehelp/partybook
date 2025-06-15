@@ -138,10 +138,44 @@ function Canvas() {
 
   // Using a ref for ws to ensure useCallback has a stable reference to the latest ws instance
   const wsRef = useRef(null);
+  const resizingRef = useRef(null);
 
   // State to manage loading feedback for saving
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+
+
+  function handleResizeMouseDown(e, item) {
+    e.stopPropagation();
+    resizingRef.current = { id: item.id, startX: e.clientX, startY: e.clientY, startWidth: item.width, startHeight: item.height };
+    window.addEventListener("mousemove", handleResizeMouseMove);
+    window.addEventListener("mouseup", handleResizeMouseUp);
+  }
+
+  function handleResizeMouseMove(e) {
+    const resize = resizingRef.current;
+    if (!resize) return;
+    const dx = e.clientX - resize.startX;
+    const dy = e.clientY - resize.startY;
+    const newWidth = Math.max(20, resize.startWidth + dx);
+    const newHeight = Math.max(20, resize.startHeight + dy);
+
+    items.value = items.value.map((item) =>
+      item.id === resize.id ? { ...item, width: newWidth, height: newHeight } : item
+    );
+
+    // Broadcast resize to others
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "resize_item", id: resize.id, width: newWidth, height: newHeight }));
+    }
+  }
+
+  function handleResizeMouseUp() {
+    resizingRef.current = null;
+    window.removeEventListener("mousemove", handleResizeMouseMove);
+    window.removeEventListener("mouseup", handleResizeMouseUp);
+  }
+
 
   useEffect(() => {
     console.log("Opening WebSocket connection to room:", currentRoomId.value);
@@ -196,6 +230,13 @@ function Canvas() {
           break;
         case "clear_canvas": // Handle clear_canvas message
           items.value = []; // Clear all items locally
+          break;
+        case "resize_item":
+          items.value = items.value.map((item) =>
+          item.id === message.id
+            ? { ...item, width: message.width, height: message.height }
+            : item
+          );
           break;
       }
     });
@@ -458,7 +499,8 @@ function Canvas() {
           item=${item}
           handleItemMouseDown=${handleItemMouseDown}
           handleItemMouseDrag=${handleItemMouseDrag}
-          handleDeleteItem=${handleDeleteItem} // Pass the new handler
+          handleDeleteItem=${handleDeleteItem} 
+          handleResize=${handleResizeMouseDown}
         />`;
       }
     })}
@@ -494,7 +536,7 @@ function Canvas() {
   </div>`;
 }
 
-function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDeleteItem }) {
+function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDeleteItem, handleResize}) {
   function handleMouseDown(event) {
     handleItemMouseDown(event, item);
   }
@@ -504,13 +546,28 @@ function ImageItem({ item, handleItemMouseDown, handleItemMouseDrag, handleDelet
     handleDeleteItem(item.id);
   }
 
-  return html`<image
-    x=${item.x}
-    y=${item.y}
-    href=${item.url}
-    onMouseDown=${handleMouseDown}
-    onDblClick=${handleDoubleClick}
-    class="select-none" />`;
+  return html`<g>
+    <image
+      x=${item.x}
+      y=${item.y}
+      width=${item.width || 100}
+      height=${item.height || 100}
+      href=${item.url}
+      onMouseDown=${handleMouseDown}
+      onDblClick=${handleDoubleClick}
+      class="select-none"
+      style="pointer-events: all;"
+    />
+    <rect
+      x=${(item.x + (item.width || 100) - 10)}
+      y=${(item.y + (item.height || 100) - 10)}
+      width="10"
+      height="10"
+      fill="red"
+      cursor="nwse-resize"
+      onMouseDown=${(e) => handleResize(e, item)}
+    />
+  </g>`;
 }
 
 function TopicButton({ roomId, name }) {
@@ -569,6 +626,8 @@ function AssetViewer() {
       x,
       y,
       name: asset.name,
+      width: 100,
+      height: 100,
     };
     items.value = [...items.value, newItem];
     if (ws && ws.readyState === WebSocket.OPEN) {
